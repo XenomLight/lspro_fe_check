@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0"
+    />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>LSPro BSSN</title>
+
+    <style>
+      [x-cloak] {
+        display: none !important;
+      }
+    </style>
+
+    <script defer>
+      let token;
+      let reviewerData;
+      document.addEventListener("alpine:init", () => {
+        if (window.isLoggedIn()) {
+          token = localStorage.getItem("token");
+          reviewerData = JSON.parse(localStorage.getItem("reviewer"));
+        } else {
+          window.location.href = "/login.html";
+        }
+      });
+      document.addEventListener("alpine:init", () => {
+        Alpine.data("IndexPagesInit", () => ({
+          page: "index",
+          darkMode: false,
+          sidebarToggle: false,
+
+          init() {
+            this.darkMode =
+              JSON.parse(localStorage.getItem("darkMode")) ?? false;
+            this.sidebarToggle =
+              JSON.parse(localStorage.getItem("sidebarToggle")) ?? false;
+
+            this.$watch("darkMode", (value) => {
+              localStorage.setItem("darkMode", JSON.stringify(value));
+            });
+
+            this.$watch("sidebarToggle", (value) => {
+              localStorage.setItem("sidebarToggle", JSON.stringify(value));
+            });
+          },
+        }));
+      });
+    </script>
+  </head>
+
+  <body
+    x-data="IndexPagesInit"
+    :class="{'dark bg-gray-900': darkMode === true}"
+  >
+    <!-- ===== Page Wrapper Start ===== -->
+    <div class="flex h-screen overflow-hidden">
+      <!-- ===== Sidebar Start ===== -->
+      <include src="./partials/sidebar.html"></include>
+      <!-- ===== Sidebar End ===== -->
+
+      <!-- ===== Content Area Start ===== -->
+      <div
+        class="relative flex flex-1 flex-col overflow-x-hidden overflow-y-auto"
+      >
+        <!-- ===== Header Start ===== -->
+        <include src="./partials/header.html" />
+        <!-- ===== Header End ===== -->
+
+        <!-- ===== Main Content Start ===== -->
+        <main>
+          <div class="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
+            <div class="mt-6 mb-6 ml-4">
+              <h2
+                class="text-4xl font-semibold text-gray-800 dark:text-white/90"
+                x-text="`Halo, ${reviewerData.name}!`"
+              ></h2>
+              <p class="mt-5 text-xl text-gray-800 dark:text-white/90">
+                Silakan pilih menu TOE di sidebar untuk memulai tahap
+                determinasi
+              </p>
+            </div>
+          </div>
+        </main>
+        <!-- ===== Main Content End ===== -->
+      </div>
+      <!-- ===== Content Area End ===== -->
+    </div>
+    <!-- ===== Page Wrapper End ===== -->
+  </body>
+</html>

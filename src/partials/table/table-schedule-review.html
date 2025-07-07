@@ -1,0 +1,829 @@
+<script>
+  document.addEventListener("alpine:init", () => {});
+  function eorScheduleTable() {
+    return {
+      loadingEorSchedule: true,
+      successLoadingEorAnalysis: true,
+      isOpenEorScheduleForm: false,
+      isOpenEorScheduleReviewForm: false,
+      eorSchedule: null,
+      eorScheduleModelScheduleOnEvaluationWorkPlanStart: null,
+      eorScheduleModelScheduleOnEvaluationWorkPlanEnd: null,
+      eorScheduleModelExecutionTimeOnWorkbookStart: null,
+      eorScheduleModelExecutionTimeOnWorkbookEnd: null,
+      eorScheduleReviewModelAuditorReview: "",
+      eorScheduleFormSubmitting: false,
+      eorScheduleReviewFormErrors: {},
+      eorScheduleReviewFormSubmitting: false,
+      doFetchEorSchedule() {
+        const id = sessionStorage.getItem("selectedEORId");
+        if (!id) {
+          console.error("ID EOR tidak ditemukan di sessionStorage");
+          this.loaded = false;
+          this.isLoadingEor = false;
+          return;
+        }
+
+        this.loadingEorSchedule = true;
+        fetch(`${window.apiHost}/eor/${id}/schedule/`, {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        })
+          .then((res) => {
+            if (!res.ok) throw new Error("Gagal autentikasi atau fetch data");
+            return res.json();
+          })
+          .then((data) => {
+            this.eorSchedule = data.data;
+            if (this.eorSchedule !== null) {
+              this.eorScheduleModelScheduleOnEvaluationWorkPlanStart =
+                window.formatDateToInput(
+                  this.eorSchedule.schedule_on_evaluation_work_plan_start,
+                );
+              this.eorScheduleModelScheduleOnEvaluationWorkPlanEnd =
+                window.formatDateToInput(
+                  this.eorSchedule.schedule_on_evaluation_work_plan_end,
+                );
+              this.eorScheduleModelExecutionTimeOnWorkbookStart =
+                window.formatDateToInput(
+                  this.eorSchedule.execution_time_on_workbook_start,
+                );
+              this.eorScheduleModelExecutionTimeOnWorkbookEnd =
+                window.formatDateToInput(
+                  this.eorSchedule.execution_time_on_workbook_end,
+                );
+              if (this.eorSchedule.eor_schedule_review) {
+                this.eorScheduleReviewModelAuditorReview =
+                  this.eorSchedule.eor_schedule_review.reviewer_review;
+              }
+            }
+            this.loadingEorSchedule = false;
+          })
+          .catch((error) => {
+            console.error("Gagal memuat EOR Schedule:", error);
+            this.loadingEorSchedule = false;
+            this.successLoadingEorAnalysis = false;
+          });
+      },
+      async submitEorScheduleForm() {
+        if (
+          !this.eorScheduleModelScheduleOnEvaluationWorkPlanStart ||
+          !this.eorScheduleModelScheduleOnEvaluationWorkPlanEnd ||
+          !this.eorScheduleModelExecutionTimeOnWorkbookStart ||
+          !this.eorScheduleModelExecutionTimeOnWorkbookEnd
+        ) {
+          await window.swal.fire({
+            text: "Semua date input wajib diisi!",
+            icon: "warning",
+          });
+          return;
+        }
+
+        this.eorScheduleFormSubmitting = true;
+
+        console.log(this.eorScheduleModelScheduleOnEvaluationWorkPlanStart);
+
+        // add new eor schedule
+        if (this.eorSchedule === null) {
+          try {
+            const eor_id = this.eor.id;
+
+            const res = await fetch(`${window.apiHost}/eor-schedule`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                eor_id: eor_id,
+                schedule_on_evaluation_work_plan_start:
+                  this.eorScheduleModelScheduleOnEvaluationWorkPlanStart,
+                schedule_on_evaluation_work_plan_end:
+                  this.eorScheduleModelScheduleOnEvaluationWorkPlanEnd,
+                execution_time_on_workbook_start:
+                  this.eorScheduleModelExecutionTimeOnWorkbookStart,
+                execution_time_on_workbook_end:
+                  this.eorScheduleModelExecutionTimeOnWorkbookEnd,
+              }),
+            });
+
+            const result = await res.json();
+            if (!res.ok) {
+              await window.swal.fire({
+                text: `Gagal membuat: ${result.message || "Terjadi kesalahan."}`,
+                icon: "error",
+              });
+              return;
+            }
+
+            await window.swal.fire({
+              text: "EOR Schedule berhasil dibuat!",
+              icon: "success",
+            });
+
+            window.location.href = "/eor.html";
+          } catch (error) {
+            await window.swal.fire({
+              text: "EOR Schedule gagal dibuat!",
+              icon: "error",
+            });
+          }
+        }
+        // edit eor schedule
+        else {
+          try {
+            const id = this.eorSchedule.id;
+
+            const res = await fetch(`${window.apiHost}/eor-schedule/${id}`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                schedule_on_evaluation_work_plan_start:
+                  this.eorScheduleModelScheduleOnEvaluationWorkPlanStart,
+                schedule_on_evaluation_work_plan_end:
+                  this.eorScheduleModelScheduleOnEvaluationWorkPlanEnd,
+                execution_time_on_workbook_start:
+                  this.eorScheduleModelExecutionTimeOnWorkbookStart,
+                execution_time_on_workbook_end:
+                  this.eorScheduleModelExecutionTimeOnWorkbookEnd,
+              }),
+            });
+
+            const result = await res.json();
+            if (!res.ok) {
+              await window.swal.fire({
+                text: `Gagal mengedit: ${result.message || "Terjadi kesalahan."}`,
+                icon: "error",
+              });
+              return;
+            }
+
+            await window.swal.fire({
+              text: "EOR Schedule berhasil diedit!",
+              icon: "success",
+            });
+
+            window.location.href = "/eor.html";
+          } catch (error) {
+            await window.swal.fire({
+              text: "EOR Schedule gagal diedit!",
+              icon: "error",
+            });
+          }
+        }
+      },
+      async submitEorScheduleReviewForm() {
+        this.eorScheduleReviewFormErrors = {};
+
+        if (
+          !this.eorScheduleReviewModelAuditorReview ||
+          this.eorScheduleReviewModelAuditorReview.trim() === ""
+        ) {
+          this.eorScheduleReviewFormErrors.eorScheduleReviewModelAuditorReview =
+            "Auditor Review harus diisi";
+        }
+
+        if (Object.keys(this.eorScheduleReviewFormErrors).length > 0) return;
+
+        this.eorScheduleFormSubmitting = true;
+
+        // add new eor schedule review
+        if (this.eorSchedule.eor_schedule_review === null) {
+          try {
+            const id = this.eorSchedule.id;
+            const res = await fetch(`${window.apiHost}/eor-schedule-review`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                eor_schedule_id: id,
+                reviewer_review: this.eorScheduleReviewModelAuditorReview,
+              }),
+            });
+
+            const result = await res.json();
+            if (!res.ok) {
+              await window.swal.fire({
+                text: `Gagal membuat: ${result.message || "Terjadi kesalahan."}`,
+                icon: "error",
+              });
+              return;
+            }
+
+            await window.swal.fire({
+              text: "EOR Schedule Review berhasil dibuat!",
+              icon: "success",
+            });
+
+            window.location.href = "/eor.html";
+          } catch (error) {
+            await window.swal.fire({
+              text: "EOR Schedule Review gagal dibuat!",
+              icon: "error",
+            });
+          }
+        }
+        // edit eor schedule
+        else {
+          try {
+            const id = this.eorSchedule.eor_schedule_review.id;
+            const res = await fetch(
+              `${window.apiHost}/eor-schedule-review/${id}`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  reviewer_review: this.eorScheduleReviewModelAuditorReview,
+                }),
+              },
+            );
+
+            const result = await res.json();
+            if (!res.ok) {
+              await window.swal.fire({
+                text: `Gagal mengedit: ${result.message || "Terjadi kesalahan."}`,
+                icon: "error",
+              });
+              return;
+            }
+
+            await window.swal.fire({
+              text: "EOR Schedule Review berhasil diedit!",
+              icon: "success",
+            });
+
+            window.location.href = "/eor.html";
+          } catch (error) {
+            await window.swal.fire({
+              text: "EOR Schedule Review gagal diedit!",
+              icon: "error",
+            });
+          }
+        }
+      },
+    };
+  }
+</script>
+
+<div
+  class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-5 pt-4 pb-3 dark:border-gray-800 dark:bg-white/[0.03] dark:[color-scheme:dark]"
+  x-data="eorScheduleTable()"
+  x-init="doFetchEorSchedule()"
+>
+  <div
+    class="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between"
+  >
+    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">
+      Schedule Review of EOR
+    </h3>
+  </div>
+
+  <div class="w-full overflow-x-auto">
+    <template x-if="loadingEorSchedule">
+      <p class="p-4 text-gray-500 dark:text-gray-400">
+        Loading EOR Schedule...
+      </p>
+    </template>
+    <template x-if="!loadingEorSchedule && successLoadingEorAnalysis === false">
+      <p class="p-4 text-gray-500 dark:text-gray-400">Error fetch data</p>
+    </template>
+
+    <!-- Header Table -->
+    <table
+      class="min-w-full table-fixed"
+      x-show="!loadingEorSchedule && successLoadingEorAnalysis === true"
+    >
+      <thead class="sticky top-0 z-10">
+        <tr class="border-y border-gray-100 dark:border-gray-800">
+          <th
+            class="w-[185px] min-w-[185px] border border-gray-200 px-2 py-2 dark:border-gray-700"
+          >
+            <div class="flex items-start justify-center">
+              <p
+                class="text-theme-xs font-medium text-gray-900 dark:text-gray-300"
+              >
+                Schedule on Evaluation Work Plan
+              </p>
+            </div>
+          </th>
+          <th
+            class="w-[185px] min-w-[185px] border border-gray-200 px-2 py-2 dark:border-gray-700"
+          >
+            <div class="flex items-start justify-center">
+              <p
+                class="text-theme-xs font-medium text-gray-900 dark:text-gray-300"
+              >
+                Execution Time on Workbook
+              </p>
+            </div>
+          </th>
+          <th
+            class="min-w-[300px] flex-1 border border-gray-200 px-2 py-2 dark:border-gray-700"
+          >
+            <div class="flex items-start justify-center">
+              <p
+                class="text-theme-xs font-medium text-gray-900 dark:text-gray-300"
+              >
+                Auditor Review
+              </p>
+            </div>
+          </th>
+        </tr>
+      </thead>
+
+      <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+        <template
+          x-if="!loadingEorSchedule && successLoadingEorAnalysis === true && eorSchedule === null"
+        >
+          <tr
+            class="align-top"
+            x-show="!isOpenEorScheduleForm && !isOpenEorScheduleReviewForm"
+          >
+            <td
+              colspan="3"
+              class="w-[260px] border border-gray-200 px-2 py-2 dark:border-gray-700"
+            >
+              <div class="flex items-start">
+                <button
+                  class="bg-success-600 shadow-theme-xs hover:bg-success-800 inline-flex items-center gap-1.5 rounded-md px-2.5 py-2 text-xs font-medium text-white transition"
+                  @click="isOpenEorScheduleForm = true"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#ffffff"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  Buat EOR Schedule
+                </button>
+              </div>
+            </td>
+          </tr>
+        </template>
+
+        <template
+          x-if="!loadingEorSchedule && successLoadingEorAnalysis === true && eorSchedule !== null"
+        >
+          <tr
+            class="align-top"
+            x-show="!isOpenEorScheduleForm && !isOpenEorScheduleReviewForm"
+          >
+            <td
+              class="w-[130px] border border-gray-200 px-2 py-2 dark:border-gray-700"
+            >
+              <div class="flex items-start">
+                <div
+                  class="text-theme-sm font-medium text-gray-800 dark:text-white/90"
+                  x-text="$formatDateToString(eorSchedule?.schedule_on_evaluation_work_plan_start) + ' - ' + $formatDateToString(eorSchedule?.schedule_on_evaluation_work_plan_end)"
+                ></div>
+              </div>
+            </td>
+
+            <td
+              class="w-[130px] border border-gray-200 px-2 py-2 dark:border-gray-700"
+            >
+              <div class="flex flex-col items-start space-y-2">
+                <div
+                  class="text-theme-sm font-medium text-gray-800 dark:text-white/90"
+                  x-text="$formatDateToString(eorSchedule?.execution_time_on_workbook_start) + ' - ' + $formatDateToString(eorSchedule?.execution_time_on_workbook_end)"
+                ></div>
+                <button
+                  class="bg-brand-600 shadow-theme-xs hover:bg-brand-800 inline-flex items-center gap-1.5 rounded-md px-2.5 py-2 text-xs font-medium text-white transition"
+                  @click="isOpenEorScheduleForm = true"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#ffffff"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M20 14.66V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5.34"
+                    ></path>
+                    <polygon points="18 2 22 6 12 16 8 16 8 12 18 2"></polygon>
+                  </svg>
+                  Edit EOR Schedule
+                </button>
+              </div>
+            </td>
+
+            <td
+              class="min-w-[300px] flex-1 border border-gray-200 px-2 py-2 dark:border-gray-700"
+            >
+              <div class="flex flex-col items-start space-y-2">
+                <p
+                  class="text-theme-sm font-medium text-gray-800 dark:text-white/90"
+                  x-show="eorSchedule?.eor_schedule_review"
+                  x-text="eorSchedule?.eor_schedule_review?.reviewer_review"
+                ></p>
+                <template x-if="!eorSchedule?.eor_schedule_review">
+                  <button
+                    class="bg-success-600 shadow-theme-xs hover:bg-success-800 inline-flex items-center gap-1.5 rounded-md px-2.5 py-2 text-xs font-medium text-white transition"
+                    x-show="isOpenEorScheduleForm === false"
+                    @click="isOpenEorScheduleReviewForm = true"
+                  >
+                    <svg
+                      class="fill-current"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        clip-rule="evenodd"
+                        d="M9.77692 3.24224C9.91768 3.17186 10.0834 3.17186 10.2241 3.24224L15.3713 5.81573L10.3359 8.33331C10.1248 8.43888 9.87626 8.43888 9.66512 8.33331L4.6298 5.81573L9.77692 3.24224ZM3.70264 7.0292V13.4124C3.70264 13.6018 3.80964 13.775 3.97903 13.8597L9.25016 16.4952L9.25016 9.7837C9.16327 9.75296 9.07782 9.71671 8.99432 9.67496L3.70264 7.0292ZM10.7502 16.4955V9.78396C10.8373 9.75316 10.923 9.71683 11.0067 9.67496L16.2984 7.0292V13.4124C16.2984 13.6018 16.1914 13.775 16.022 13.8597L10.7502 16.4955ZM9.41463 17.4831L9.10612 18.1002C9.66916 18.3817 10.3319 18.3817 10.8949 18.1002L16.6928 15.2013C17.3704 14.8625 17.7984 14.17 17.7984 13.4124V6.58831C17.7984 5.83076 17.3704 5.13823 16.6928 4.79945L10.8949 1.90059C10.3319 1.61908 9.66916 1.61907 9.10612 1.90059L9.44152 2.57141L9.10612 1.90059L3.30823 4.79945C2.63065 5.13823 2.20264 5.83076 2.20264 6.58831V13.4124C2.20264 14.17 2.63065 14.8625 3.30823 15.2013L9.10612 18.1002L9.41463 17.4831Z"
+                        fill=""
+                      />
+                    </svg>
+                    Buat EOR Schedule Review
+                  </button>
+                </template>
+                <template x-if="eorSchedule?.eor_schedule_review">
+                  <button
+                    class="bg-brand-600 shadow-theme-xs hover:bg-brand-800 inline-flex items-center gap-1.5 rounded-md px-2.5 py-2 text-xs font-medium text-white transition"
+                    x-show="isOpenEorScheduleForm === false"
+                    @click="isOpenEorScheduleReviewForm = true"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#ffffff"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path
+                        d="M20 14.66V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5.34"
+                      ></path>
+                      <polygon
+                        points="18 2 22 6 12 16 8 16 8 12 18 2"
+                      ></polygon>
+                    </svg>
+                    Edit EOR Schedule Review
+                  </button>
+                </template>
+              </div>
+            </td>
+          </tr>
+        </template>
+
+        <tr class="align-top" x-show="isOpenEorScheduleForm">
+          <td
+            class="w-[130px] border border-gray-200 px-2 py-2 dark:border-gray-700"
+          >
+            <div class="flex items-start">
+              <div>
+                <label
+                  class="mb-1.5 ml-1 block text-sm font-medium text-gray-700 dark:text-gray-400"
+                >
+                  Schedule on Evaluation Work Plan Date
+                </label>
+
+                <label
+                  class="mt-2 mb-1.5 ml-1 block text-sm text-gray-700 dark:text-gray-400"
+                >
+                  Start
+                </label>
+                <div class="relative">
+                  <input
+                    type="date"
+                    placeholder="Pilih tanggal"
+                    x-model="eorScheduleModelScheduleOnEvaluationWorkPlanStart"
+                    class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full appearance-none rounded-lg border border-gray-300 bg-transparent bg-none px-4 py-2.5 pr-11 pl-4 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                    onclick="this.showPicker()"
+                  />
+                  <span
+                    class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-gray-500 dark:text-gray-400"
+                  >
+                    <svg
+                      class="fill-current"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        clip-rule="evenodd"
+                        d="M6.66659 1.5415C7.0808 1.5415 7.41658 1.87729 7.41658 2.2915V2.99984H12.5833V2.2915C12.5833 1.87729 12.919 1.5415 13.3333 1.5415C13.7475 1.5415 14.0833 1.87729 14.0833 2.2915V2.99984L15.4166 2.99984C16.5212 2.99984 17.4166 3.89527 17.4166 4.99984V7.49984V15.8332C17.4166 16.9377 16.5212 17.8332 15.4166 17.8332H4.58325C3.47868 17.8332 2.58325 16.9377 2.58325 15.8332V7.49984V4.99984C2.58325 3.89527 3.47868 2.99984 4.58325 2.99984L5.91659 2.99984V2.2915C5.91659 1.87729 6.25237 1.5415 6.66659 1.5415ZM6.66659 4.49984H4.58325C4.30711 4.49984 4.08325 4.7237 4.08325 4.99984V6.74984H15.9166V4.99984C15.9166 4.7237 15.6927 4.49984 15.4166 4.49984H13.3333H6.66659ZM15.9166 8.24984H4.08325V15.8332C4.08325 16.1093 4.30711 16.3332 4.58325 16.3332H15.4166C15.6927 16.3332 15.9166 16.1093 15.9166 15.8332V8.24984Z"
+                        fill=""
+                      />
+                    </svg>
+                  </span>
+                </div>
+
+                <label
+                  class="mt-2 mb-1.5 ml-1 block text-sm text-gray-700 dark:text-gray-400"
+                >
+                  End
+                </label>
+                <div class="relative">
+                  <input
+                    type="date"
+                    placeholder="Pilih tanggal"
+                    x-model="eorScheduleModelScheduleOnEvaluationWorkPlanEnd"
+                    class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full appearance-none rounded-lg border border-gray-300 bg-transparent bg-none px-4 py-2.5 pr-11 pl-4 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                    onclick="this.showPicker()"
+                  />
+                  <span
+                    class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-gray-500 dark:text-gray-400"
+                  >
+                    <svg
+                      class="fill-current"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        clip-rule="evenodd"
+                        d="M6.66659 1.5415C7.0808 1.5415 7.41658 1.87729 7.41658 2.2915V2.99984H12.5833V2.2915C12.5833 1.87729 12.919 1.5415 13.3333 1.5415C13.7475 1.5415 14.0833 1.87729 14.0833 2.2915V2.99984L15.4166 2.99984C16.5212 2.99984 17.4166 3.89527 17.4166 4.99984V7.49984V15.8332C17.4166 16.9377 16.5212 17.8332 15.4166 17.8332H4.58325C3.47868 17.8332 2.58325 16.9377 2.58325 15.8332V7.49984V4.99984C2.58325 3.89527 3.47868 2.99984 4.58325 2.99984L5.91659 2.99984V2.2915C5.91659 1.87729 6.25237 1.5415 6.66659 1.5415ZM6.66659 4.49984H4.58325C4.30711 4.49984 4.08325 4.7237 4.08325 4.99984V6.74984H15.9166V4.99984C15.9166 4.7237 15.6927 4.49984 15.4166 4.49984H13.3333H6.66659ZM15.9166 8.24984H4.08325V15.8332C4.08325 16.1093 4.30711 16.3332 4.58325 16.3332H15.4166C15.6927 16.3332 15.9166 16.1093 15.9166 15.8332V8.24984Z"
+                        fill=""
+                      />
+                    </svg>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </td>
+
+          <td
+            class="w-[130px] border border-gray-200 px-2 py-2 dark:border-gray-700"
+          >
+            <div class="flex items-start">
+              <div>
+                <label
+                  class="mb-1.5 ml-1 block text-sm font-medium text-gray-700 dark:text-gray-400"
+                >
+                  Execution Time on Workbook Date
+                </label>
+
+                <label
+                  class="mt-2 mb-1.5 ml-1 block text-sm text-gray-700 dark:text-gray-400"
+                >
+                  Start
+                </label>
+                <div class="relative">
+                  <input
+                    type="date"
+                    placeholder="Pilih tanggal"
+                    x-model="eorScheduleModelExecutionTimeOnWorkbookStart"
+                    class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full appearance-none rounded-lg border border-gray-300 bg-transparent bg-none px-4 py-2.5 pr-11 pl-4 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                    onclick="this.showPicker()"
+                  />
+                  <span
+                    class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-gray-500 dark:text-gray-400"
+                  >
+                    <svg
+                      class="fill-current"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        clip-rule="evenodd"
+                        d="M6.66659 1.5415C7.0808 1.5415 7.41658 1.87729 7.41658 2.2915V2.99984H12.5833V2.2915C12.5833 1.87729 12.919 1.5415 13.3333 1.5415C13.7475 1.5415 14.0833 1.87729 14.0833 2.2915V2.99984L15.4166 2.99984C16.5212 2.99984 17.4166 3.89527 17.4166 4.99984V7.49984V15.8332C17.4166 16.9377 16.5212 17.8332 15.4166 17.8332H4.58325C3.47868 17.8332 2.58325 16.9377 2.58325 15.8332V7.49984V4.99984C2.58325 3.89527 3.47868 2.99984 4.58325 2.99984L5.91659 2.99984V2.2915C5.91659 1.87729 6.25237 1.5415 6.66659 1.5415ZM6.66659 4.49984H4.58325C4.30711 4.49984 4.08325 4.7237 4.08325 4.99984V6.74984H15.9166V4.99984C15.9166 4.7237 15.6927 4.49984 15.4166 4.49984H13.3333H6.66659ZM15.9166 8.24984H4.08325V15.8332C4.08325 16.1093 4.30711 16.3332 4.58325 16.3332H15.4166C15.6927 16.3332 15.9166 16.1093 15.9166 15.8332V8.24984Z"
+                        fill=""
+                      />
+                    </svg>
+                  </span>
+                </div>
+
+                <label
+                  class="mt-2 mb-1.5 ml-1 block text-sm text-gray-700 dark:text-gray-400"
+                >
+                  End
+                </label>
+                <div class="relative">
+                  <input
+                    type="date"
+                    placeholder="Pilih tanggal"
+                    x-model="eorScheduleModelExecutionTimeOnWorkbookEnd"
+                    class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full appearance-none rounded-lg border border-gray-300 bg-transparent bg-none px-4 py-2.5 pr-11 pl-4 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                    onclick="this.showPicker()"
+                  />
+                  <span
+                    class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-gray-500 dark:text-gray-400"
+                  >
+                    <svg
+                      class="fill-current"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        clip-rule="evenodd"
+                        d="M6.66659 1.5415C7.0808 1.5415 7.41658 1.87729 7.41658 2.2915V2.99984H12.5833V2.2915C12.5833 1.87729 12.919 1.5415 13.3333 1.5415C13.7475 1.5415 14.0833 1.87729 14.0833 2.2915V2.99984L15.4166 2.99984C16.5212 2.99984 17.4166 3.89527 17.4166 4.99984V7.49984V15.8332C17.4166 16.9377 16.5212 17.8332 15.4166 17.8332H4.58325C3.47868 17.8332 2.58325 16.9377 2.58325 15.8332V7.49984V4.99984C2.58325 3.89527 3.47868 2.99984 4.58325 2.99984L5.91659 2.99984V2.2915C5.91659 1.87729 6.25237 1.5415 6.66659 1.5415ZM6.66659 4.49984H4.58325C4.30711 4.49984 4.08325 4.7237 4.08325 4.99984V6.74984H15.9166V4.99984C15.9166 4.7237 15.6927 4.49984 15.4166 4.49984H13.3333H6.66659ZM15.9166 8.24984H4.08325V15.8332C4.08325 16.1093 4.30711 16.3332 4.58325 16.3332H15.4166C15.6927 16.3332 15.9166 16.1093 15.9166 15.8332V8.24984Z"
+                        fill=""
+                      />
+                    </svg>
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div class="mt-3 flex items-start">
+              <div>
+                <button
+                  class="shadow-theme-xs mb-2 inline-flex w-full items-start justify-start gap-2 rounded-lg bg-red-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-red-800"
+                  @click="isOpenEorScheduleForm = false"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#ffffff"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                  Batal
+                </button>
+
+                <button
+                  class="shadow-theme-xs bg-success-600 hover:bg-success-800 mb-2 inline-flex w-full items-start justify-start gap-2 rounded-lg px-4 py-3 text-left text-sm font-medium text-white transition"
+                  @click="submitEorScheduleForm()"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#ffffff"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"
+                    ></path>
+                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                    <polyline points="7 3 7 8 15 8"></polyline>
+                  </svg>
+                  Simpan EOR Schedule
+                </button>
+              </div>
+            </div>
+          </td>
+
+          <td
+            class="min-w-[300px] flex-1 border border-gray-200 px-2 py-2 dark:border-gray-700"
+          >
+            <div class="flex items-start">
+              <p
+                class="text-theme-sm font-medium text-gray-800 dark:text-white/90"
+                x-text="eorScheduleReviewModelAuditorReview"
+              ></p>
+            </div>
+          </td>
+        </tr>
+
+        <tr class="align-top" x-show="isOpenEorScheduleReviewForm">
+          <td
+            class="w-[130px] border border-gray-200 px-2 py-2 dark:border-gray-700"
+          >
+            <div class="flex items-start">
+              <div
+                class="text-theme-sm font-medium text-gray-800 dark:text-white/90"
+                x-text="$formatDateToString(eorSchedule?.schedule_on_evaluation_work_plan_start) + ' - ' + $formatDateToString(eorSchedule?.schedule_on_evaluation_work_plan_end)"
+              ></div>
+            </div>
+          </td>
+
+          <td
+            class="w-[130px] border border-gray-200 px-2 py-2 dark:border-gray-700"
+          >
+            <div class="flex items-start">
+              <div
+                class="text-theme-sm font-medium text-gray-800 dark:text-white/90"
+                x-text="$formatDateToString(eorSchedule?.execution_time_on_workbook_start) + ' - ' + $formatDateToString(eorSchedule?.execution_time_on_workbook_end)"
+              ></div>
+            </div>
+          </td>
+
+          <td
+            class="min-w-[300px] flex-1 border border-gray-200 px-2 py-2 dark:border-gray-700"
+          >
+            <div class="flex flex-col items-start space-y-2">
+              <div class="w-full px-1">
+                <label
+                  class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
+                >
+                  Auditor Review
+                </label>
+                <textarea
+                  placeholder="Masukkan Auditor Review"
+                  rows="6"
+                  type="text"
+                  :class="[
+                              'w-full rounded-lg px-4 py-2.5 text-sm shadow-theme-xs bg-transparent focus:outline-none',
+                              eorScheduleReviewFormErrors.eorScheduleReviewModelAuditorReview
+                                ? 'border border-red-500 focus:border-red-500 focus:ring-red-500/10' 
+                                : 'border border-gray-300 focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800',
+                              'dark:bg-gray-900 dark:text-white/90 dark:border-gray-700 placeholder:text-gray-400 dark:placeholder:text-white/30'
+                            ]"
+                  x-model="eorScheduleReviewModelAuditorReview"
+                ></textarea>
+                <p
+                  x-show="eorScheduleReviewFormErrors.eorScheduleReviewModelAuditorReview"
+                  x-text="eorScheduleReviewFormErrors.eorScheduleReviewModelAuditorReview"
+                  class="text-theme-xs text-error-500 mt-1.5"
+                ></p>
+                <div class="mt-5 mb-3">
+                  <button
+                    type="button"
+                    @click="isOpenEorScheduleReviewForm = null"
+                    class="shadow-theme-xs mb-2 inline-flex w-full items-center gap-2 rounded-lg bg-red-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-red-800 2xl:mb-0 2xl:w-auto"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#ffffff"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                    Batal
+                  </button>
+
+                  <button
+                    type="button"
+                    class="shadow-theme-xs bg-success-600 hover:bg-success-800 mb-2 inline-flex w-full items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white transition 2xl:mb-0 2xl:w-auto"
+                    @click="submitEorScheduleReviewForm()"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#ffffff"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path
+                        d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"
+                      ></path>
+                      <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                      <polyline points="7 3 7 8 15 8"></polyline>
+                    </svg>
+                    Simpan Review
+                  </button>
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

@@ -1,0 +1,354 @@
+<script>
+  function dropdown() {
+    return {
+      show: false,
+      open() {
+        this.show = true;
+      },
+      close() {
+        this.show = false;
+      },
+      isOpen() {
+        return this.show === true;
+      },
+      select(index, event) {
+        if (!this.reviewerOptions[index].selected) {
+          this.reviewerOptions[index].selected = true;
+          this.reviewerOptions[index].element = event.target;
+          this.reviewerSelectedAsTOEReviewerIndex.push(index);
+        } else {
+          this.reviewerSelectedAsTOEReviewerIndex.splice(
+            this.reviewerSelectedAsTOEReviewerIndex.lastIndexOf(index),
+            1,
+          );
+          this.reviewerOptions[index].selected = false;
+        }
+        console.log(this.selectedValues());
+      },
+      remove(index, option) {
+        this.reviewerOptions[option].selected = false;
+        this.reviewerSelectedAsTOEReviewerIndex.splice(index, 1);
+        console.log(this.selectedValues());
+      },
+      selectedValues() {
+        return this.reviewerSelectedAsTOEReviewerIndex.map((option) => {
+          return this.reviewerOptions[option].value;
+        });
+      },
+      async submitTOEReviewer(reviewerIndexList) {
+        if (this.selectedToe.reviewers.length === 0) {
+          try {
+            for (const [index, reviewerId] of reviewerIndexList.entries()) {
+              const res = await fetch(`${window.apiHost}/toe-reviewer`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  toe_id: this.selectedToe.id,
+                  reviewer_id: reviewerId,
+                  is_lead_reviewer: index === 0,
+                }),
+              });
+
+              const result = await res.json();
+
+              if (!res.ok) {
+                await window.swal.fire({
+                  text: `Gagal menentukan TOE Reviewer: ${result.message || "Terjadi kesalahan."}`,
+                  icon: "error",
+                });
+                return;
+              }
+            }
+
+            await window.swal.fire({
+              text: "TOE Reviewer berhasil ditentukan!",
+              icon: "success",
+            });
+            location.reload();
+          } catch (error) {
+            await window.swal.fire({
+              text: "TOE Reviewer gagal ditentukan!",
+              icon: "error",
+            });
+          }
+        } else {
+          const oldReviewerIds = this.selectedToe.reviewers.map((r) => r.id);
+          console.table(this.selectedToe.reviewers);
+          const newReviewerIds = reviewerIndexList;
+
+          // Reviewer yang perlu ditambahkan
+          const toAdd = newReviewerIds.filter(
+            (id) => !oldReviewerIds.includes(id),
+          );
+
+          // Reviewer yang perlu dihapus
+          const toRemove = oldReviewerIds.filter(
+            (id) => !newReviewerIds.includes(id),
+          );
+
+          try {
+            // Tambah reviewer baru
+            for (const reviewerId of toAdd) {
+              const res = await fetch(`${window.apiHost}/toe-reviewer`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  toe_id: this.selectedToe.id,
+                  reviewer_id: reviewerId,
+                }),
+              });
+
+              const result = await res.json();
+              if (!res.ok) {
+                throw new Error(result.message || "Terjadi kesalahan.");
+                return;
+              }
+            }
+
+            // Hapus reviewer yang sudah tidak dipilih
+            for (const reviewerId of toRemove) {
+              const res = await fetch(`${window.apiHost}/toe-reviewer`, {
+                method: "DELETE",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  toe_id: this.selectedToe.id,
+                  reviewer_id: reviewerId,
+                }),
+              });
+
+              const result = await res.json();
+              if (!res.ok) {
+                throw new Error(result.message || "Terjadi kesalahan.");
+                return;
+              }
+            }
+
+            await window.swal.fire({
+              text: "TOE Reviewer berhasil diperbarui!",
+              icon: "success",
+            });
+            location.reload();
+          } catch (error) {
+            await window.swal.fire({
+              text: `TOE Reviewer gagal diperbarui!: ${error.message || "Terjadi kesalahan."}`,
+              icon: "error",
+            });
+          }
+        }
+      },
+    };
+  }
+</script>
+
+<div
+  x-data="dropdown()"
+  class="fixed inset-0 z-1000 flex items-center justify-center p-5"
+>
+  <div
+    class="modal-close-btn fixed inset-0 h-full w-full bg-gray-400/50 backdrop-blur-[32px]"
+  ></div>
+  <div
+    class="no-scrollbar relative w-full max-w-[700px] rounded-3xl bg-white p-4 lg:p-11 dark:bg-gray-900"
+  >
+    <!-- close btn -->
+    <button
+      class="transition-color absolute top-5 right-5 z-999 flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:bg-gray-700 dark:bg-white/[0.05] dark:text-gray-400 dark:hover:bg-white/[0.07] dark:hover:text-gray-300"
+      @click="isOpenToeReviewerModal = false; close()"
+    >
+      <svg
+        class="fill-current"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          fill-rule="evenodd"
+          clip-rule="evenodd"
+          d="M6.04289 16.5418C5.65237 16.9323 5.65237 17.5655 6.04289 17.956C6.43342 18.3465 7.06658 18.3465 7.45711 17.956L11.9987 13.4144L16.5408 17.9565C16.9313 18.347 17.5645 18.347 17.955 17.9565C18.3455 17.566 18.3455 16.9328 17.955 16.5423L13.4129 12.0002L17.955 7.45808C18.3455 7.06756 18.3455 6.43439 17.955 6.04387C17.5645 5.65335 16.9313 5.65335 16.5408 6.04387L11.9987 10.586L7.45711 6.04439C7.06658 5.65386 6.43342 5.65386 6.04289 6.04439C5.65237 6.43491 5.65237 7.06808 6.04289 7.4586L10.5845 12.0002L6.04289 16.5418Z"
+          fill=""
+        />
+      </svg>
+    </button>
+    <div class="px-2 pr-14">
+      <h4 class="mb-2 text-2xl font-semibold text-gray-800 dark:text-white/90">
+        Tentukan TOE Reviewer
+      </h4>
+      <p class="mb-6 text-sm text-gray-500 lg:mb-7 dark:text-gray-400">
+        Tentukan Reviewer untuk TOE
+      </p>
+    </div>
+    <form class="flex flex-col">
+      <div class="h-[100px] px-2">
+        <div class="grid grid-cols-1 gap-x-6 gap-y-5">
+          <div>
+            <label
+              class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
+            >
+              TOE Reviewer
+            </label>
+            <div class="flex flex-col items-center">
+              <input name="values" type="hidden" :value="selectedValues()" />
+              <div class="relative z-20 inline-block w-full">
+                <div class="relative flex flex-col items-center">
+                  <div @click="open" class="w-full">
+                    <div
+                      class="shadow-theme-xs focus:border-brand-300 focus:shadow-focus-ring dark:focus:border-brand-300 mb-2 flex h-15 rounded-lg border border-gray-300 py-1.5 pr-3 pl-3 outline-hidden transition dark:border-gray-700 dark:bg-gray-900"
+                    >
+                      <div
+                        class="flex max-w-full flex-auto flex-nowrap gap-2 overflow-x-auto"
+                      >
+                        <template
+                          x-for="(option,index) in reviewerSelectedAsTOEReviewerIndex"
+                          :key="index"
+                        >
+                          <div
+                            :class="index === 0 
+                            ? 'group flex h-6 items-center justify-center rounded-full border-[0.7px] border-transparent bg-brand-200 py-1 pr-2 pl-2.5 text-sm text-brand-800 hover:border-brand-200 dark:bg-brand-500/20 dark:text-brand-300 dark:hover:border-brand-500' 
+                            : 'group flex h-6 items-center justify-center rounded-full border-[0.7px] border-transparent bg-gray-100 py-1 pr-2 pl-2.5 text-sm text-gray-800 hover:border-gray-200 dark:bg-gray-800 dark:text-white/90 dark:hover:border-gray-800'"
+                          >
+                            <div
+                              class="w-auto max-w-none whitespace-nowrap"
+                              x-model="reviewerOptions[option]"
+                              x-text="reviewerOptions[option].text"
+                            ></div>
+                            <div class="flex flex-auto flex-row-reverse">
+                              <div
+                                @click="remove(index,option)"
+                                class="cursor-pointer pl-2 text-gray-500 group-hover:text-gray-400 dark:text-gray-400"
+                              >
+                                <svg
+                                  class="fill-current"
+                                  role="button"
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 14 14"
+                                  fill="none"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                >
+                                  <path
+                                    fill-rule="evenodd"
+                                    clip-rule="evenodd"
+                                    d="M3.40717 4.46881C3.11428 4.17591 3.11428 3.70104 3.40717 3.40815C3.70006 3.11525 4.17494 3.11525 4.46783 3.40815L6.99943 5.93975L9.53095 3.40822C9.82385 3.11533 10.2987 3.11533 10.5916 3.40822C10.8845 3.70112 10.8845 4.17599 10.5916 4.46888L8.06009 7.00041L10.5916 9.53193C10.8845 9.82482 10.8845 10.2997 10.5916 10.5926C10.2987 10.8855 9.82385 10.8855 9.53095 10.5926L6.99943 8.06107L4.46783 10.5927C4.17494 10.8856 3.70006 10.8856 3.40717 10.5927C3.11428 10.2998 3.11428 9.8249 3.40717 9.53201L5.93877 7.00041L3.40717 4.46881Z"
+                                    fill=""
+                                  />
+                                </svg>
+                              </div>
+                            </div>
+                          </div>
+                        </template>
+                        <div
+                          x-show="reviewerSelectedAsTOEReviewerIndex.length == 0"
+                          class="flex-1"
+                        >
+                          <input
+                            placeholder="Pilih Reviewer untuk TOE. Reviewer pertama adalah Lead Auditor"
+                            class="h-full w-full appearance-none border-0 bg-transparent p-1 pr-2 text-sm outline-hidden placeholder:text-gray-400 focus:border-0 focus:ring-0 focus:outline-hidden dark:placeholder:text-white/30"
+                            :value="selectedValues()"
+                          />
+                        </div>
+                      </div>
+                      <div class="flex w-7 items-center py-1 pr-1 pl-1">
+                        <button
+                          type="button"
+                          @click="open"
+                          class="h-5 w-5 cursor-pointer text-gray-700 outline-hidden focus:outline-hidden dark:text-gray-400"
+                          :class="isOpen() === true ? 'rotate-180' : ''"
+                        >
+                          <svg
+                            class="stroke-current"
+                            width="20"
+                            height="20"
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M4.79175 7.39551L10.0001 12.6038L15.2084 7.39551"
+                              stroke=""
+                              stroke-width="1.5"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="w-full px-4">
+                    <div
+                      x-show.transition.origin.top="isOpen()"
+                      class="max-h-select absolute top-full left-0 z-[100000] w-full rounded-lg bg-white shadow-sm dark:bg-gray-900"
+                      @click.outside="close"
+                    >
+                      <div
+                        class="flex max-h-[200px] w-full flex-col overflow-y-auto"
+                      >
+                        <template
+                          x-for="(option,index) in reviewerOptions"
+                          :key="index"
+                        >
+                          <div>
+                            <div
+                              class="hover:bg-primary/5 w-full cursor-pointer rounded-t border-b border-gray-200 dark:border-gray-800"
+                              @click="select(index,$event)"
+                            >
+                              <div
+                                :class="option.selected ? 'border-primary' : ''"
+                                class="relative flex w-full items-center border-l-2 border-transparent p-2 pl-2"
+                              >
+                                <div
+                                  class="flex w-full items-center justify-between"
+                                >
+                                  <div
+                                    class="mx-2 leading-6 text-gray-800 dark:text-white/90"
+                                    x-model="option"
+                                    x-text="option.text"
+                                  ></div>
+                                  <div
+                                    class="text-theme-xs text-success-600 text-success-600 dark:bg-success-500/15 dark:text-success-500 rounded-full bg-green-100 p-4 px-2 py-0.5 font-medium"
+                                    x-text="option.title"
+                                  ></div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="mt-6 flex items-center gap-3 px-2 lg:justify-end">
+        <button
+          type="button"
+          class="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:w-auto dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03]"
+          @click="isOpenToeReviewerModal = false; close()"
+        >
+          Batal
+        </button>
+        <button
+          type="button"
+          @click="submitTOEReviewer(selectedValues())"
+          class="bg-brand-500 hover:bg-brand-600 flex w-full justify-center rounded-lg px-4 py-2.5 text-sm font-medium text-white sm:w-auto"
+        >
+          Simpan
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

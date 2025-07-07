@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0"
+    />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>EOR | LSPro BSSN</title>
+
+    <style>
+      [x-cloak] {
+        display: none !important;
+      }
+      input[type="date"]::-webkit-calendar-picker-indicator {
+        display: none;
+      }
+      input[type="date"]::-moz-calendar-picker-indicator {
+        display: none;
+      }
+    </style>
+
+    <script defer>
+      let token;
+      let reviewerData;
+      document.addEventListener("alpine:init", () => {
+        if (window.isLoggedIn()) {
+          token = localStorage.getItem("token");
+          reviewerData = JSON.parse(localStorage.getItem("reviewer"));
+        } else {
+          token = null;
+          window.location.href = "/login.html";
+        }
+      });
+      document.addEventListener("alpine:init", () => {
+        Alpine.data("EORPagesInit", () => ({
+          // old properties
+          page: "eor",
+          darkMode: false,
+          sidebarToggle: false,
+
+          // new properties
+          isLoadingEor: true,
+          toe: null,
+          eor: null,
+          eorName: "",
+          isOpenEorModal: false,
+          isEditingEor: true,
+          eorModelProjectId: "",
+          eorModelWorkbookId: "",
+          eorModelWorkPackage: "",
+          eorModelDeliverablesReference: "",
+          eorModelCcComponents: "",
+          eorModelWorkbookReleasedDate: "",
+          eorFormErrors: {},
+          init() {
+            const id = sessionStorage.getItem("selectedEORId");
+            if (!id) {
+              console.error("ID EOR tidak ditemukan di sessionStorage");
+              this.loaded = false;
+              this.isLoadingEor = false;
+              return;
+            }
+            const toeIdParam = sessionStorage.getItem("toeId");
+            if (!toeIdParam) {
+              console.error("TOE id tidak ditemukan di sessionStorage");
+              this.loaded = false;
+              this.isLoadingEor = false;
+              return;
+            }
+
+            try {
+              fetch(`${window.apiHost}/toe/${toeIdParam}`, {
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+              })
+                .then((res) => {
+                  if (!res.ok) throw new Error("Gagal fetch TOE");
+                  return res.json();
+                })
+                .then((data) => {
+                  this.toe = data.data;
+                })
+                .catch((error) => {
+                  console.error("Error:", error);
+                  this.isLoadingEor = false;
+                  this.loaded = false;
+                });
+
+              fetch(`${window.apiHost}/eor/${id}`, {
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+              })
+                .then((res) => {
+                  if (!res.ok) throw new Error("Gagal fetch EOR");
+                  return res.json();
+                })
+                .then((data) => {
+                  this.eor = data.data;
+                  this.eorModelProjectId = this.eor.project_id;
+                  this.eorModelWorkbookId = this.eor.workbook_id;
+                  this.eorModelWorkPackage = this.eor.work_package;
+                  this.eorModelDeliverablesReference =
+                    window.formatJSONArrayToInput(
+                      this.eor.deliverables_reference,
+                    );
+                  this.eorModelCcComponents = window.formatJSONArrayToInput(
+                    this.eor.cc_components,
+                  );
+                  this.eorModelWorkbookReleasedDate = window.formatDateToInput(
+                    this.eor.workbook_released_date,
+                  );
+
+                  this.isLoadingEor = false;
+                  this.loaded = false;
+                  this.eorName = `[${this.eor.work_package}] ${this.eor.workbook_id}`;
+                })
+                .catch((error) => {
+                  console.error("Error:", error);
+                  this.isLoadingEor = false;
+                  this.loaded = false;
+                });
+            } catch (error) {
+              console.error("Error:", error);
+              this.isLoadingEor = false;
+              this.loaded = false;
+            }
+          },
+
+          async deleteEOR() {
+            const confirmed = await window.swal.fire({
+              text: "Apakah kamu yakin ingin menghapus EOR ini?",
+              icon: "warning",
+              showCancelButton: true,
+              confirmButtonColor: "#1d4ed8",
+              confirmButtonText: "Ya!",
+              cancelButtonColor: "#dc2626",
+              cancelButtonText: "Batal",
+            });
+
+            if (!confirmed.isConfirmed) return;
+
+            try {
+              const id = this.eor.id;
+              const res = await fetch(`${window.apiHost}/eor/${id}`, {
+                method: "DELETE",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+              });
+
+              const result = await res.json();
+
+              if (!res.ok) {
+                await window.swal.fire({
+                  text: `Gagal menghapus: ${result.message || "Terjadi kesalahan."}`,
+                  icon: "error",
+                });
+                return;
+              }
+
+              await window.swal.fire({
+                text: "EOR berhasil dihapus!",
+                icon: "success",
+              });
+
+              window.location.href = "/toe.html";
+            } catch (error) {
+              await window.swal.fire({
+                text: "EOR gagal dihapus!",
+                icon: "error",
+              });
+            }
+          },
+
+          async deleteEORReviewReport() {
+            const confirmed = await window.swal.fire({
+              text: "Apakah kamu yakin ingin menghapus EOR Review Report ini?",
+              icon: "warning",
+              showCancelButton: true,
+              confirmButtonColor: "#1d4ed8",
+              confirmButtonText: "Ya!",
+              cancelButtonColor: "#dc2626",
+              cancelButtonText: "Batal",
+            });
+
+            if (!confirmed.isConfirmed) return;
+
+            try {
+              const id = this.eor.id;
+              const res = await fetch(
+                `${window.apiHost}/eor/${id}/review-report`,
+                {
+                  method: "DELETE",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                },
+              );
+
+              const result = await res.json();
+
+              if (!res.ok) {
+                await window.swal.fire({
+                  text: `Gagal menghapus: ${result.message || "Terjadi kesalahan."}`,
+                  icon: "error",
+                });
+                return;
+              }
+
+              await window.swal.fire({
+                text: "EOR Review Report berhasil dihapus!",
+                icon: "success",
+              });
+
+              window.location.href = "/eor.html";
+            } catch (error) {
+              await window.swal.fire({
+                text: "EOR Review Report gagal dihapus!",
+                icon: "error",
+              });
+            }
+          },
+
+          openEorModal() {
+            this.eorFormErrors = {};
+
+            this.isOpenEorModal = true;
+            this.eorModelProjectId = this.eor.project_id;
+            this.eorModelWorkbookId = this.eor.workbook_id;
+            this.eorModelWorkPackage = this.eor.work_package;
+            this.eorModelDeliverablesReference = window.formatJSONArrayToInput(
+              this.eor.deliverables_reference,
+            );
+            this.eorModelCcComponents = window.formatJSONArrayToInput(
+              this.eor.cc_components,
+            );
+            this.eorModelWorkbookReleasedDate = window.formatDateToInput(
+              this.eor.workbook_released_date,
+            );
+          },
+        }));
+      });
+    </script>
+  </head>
+  <body
+    x-data="EORPagesInit"
+    x-init="
+         darkMode = JSON.parse(localStorage.getItem('darkMode'));
+         $watch('darkMode', value => localStorage.setItem('darkMode', JSON.stringify(value)));
+         sidebarToggle = JSON.parse(localStorage.getItem('sidebarToggle'));
+         $watch('sidebarToggle', value => localStorage.setItem('sidebarToggle', JSON.stringify(value)));
+         "
+    :class="{'dark bg-gray-900': darkMode === true}"
+  >
+    <!-- ===== Page Wrapper Start ===== -->
+    <div class="flex h-screen overflow-hidden">
+      <!-- ===== Sidebar Start ===== -->
+      <include src="./partials/sidebar.html"></include>
+      <!-- ===== Sidebar End ===== -->
+
+      <!-- ===== Content Area Start ===== -->
+      <div
+        class="relative flex flex-1 flex-col overflow-x-hidden overflow-y-auto"
+      >
+        <!-- ===== Header Start ===== -->
+        <include src="./partials/header.html" />
+        <!-- ===== Header End ===== -->
+
+        <!-- ===== Main Content Start ===== -->
+        <main>
+          <div class="mx-auto max-w-(--breakpoint-2xl) p-6">
+            <!-- Breadcrumb Start -->
+            <div>
+              <div
+                class="mb-6 flex flex-wrap items-center justify-between gap-3"
+              >
+                <nav>
+                  <ol class="flex items-center gap-1.5">
+                    <li>
+                      <a
+                        class="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400"
+                        href="toe.html"
+                      >
+                        <span x-text="toe?.title"></span>
+                        <svg
+                          class="stroke-current"
+                          width="17"
+                          height="16"
+                          viewBox="0 0 17 16"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M6.0765 12.667L10.2432 8.50033L6.0765 4.33366"
+                            stroke=""
+                            stroke-width="1.2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                          />
+                        </svg>
+                      </a>
+                    </li>
+                    <li>
+                      <h2
+                        class="text-2xl font-semibold text-gray-800 dark:text-white/90"
+                        x-text="eorName"
+                      ></h2>
+                    </li>
+                  </ol>
+                </nav>
+              </div>
+            </div>
+            <!-- Breadcrumb End -->
+
+            <!-- ====== Form Elements Section Start -->
+            <div>
+              <div>
+                <div>
+                  <div
+                    class="mb-6 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]"
+                  >
+                    <div
+                      class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between"
+                    >
+                      <div>
+                        <h4
+                          class="mb-6 text-lg font-semibold text-gray-800 dark:text-white/90"
+                        >
+                          Identifikasi EOR
+                        </h4>
+
+                        <template x-if="isLoadingEor">
+                          <p class="p-4 text-gray-500 dark:text-gray-400">
+                            Loading EOR...
+                          </p>
+                        </template>
+                        <template x-if="!isLoadingEor && eor === null">
+                          <p class="p-4 text-gray-500 dark:text-gray-400">
+                            Error fetch data
+                          </p>
+                        </template>
+
+                        <div x-show="!isLoadingEor && eor !== null">
+                          <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                            <!-- Kolom Kiri (2/3) -->
+                            <div class="space-y-4 lg:col-span-2">
+                              <div>
+                                <p
+                                  class="mb-1 text-xs leading-normal text-gray-500 dark:text-gray-400"
+                                >
+                                  Project ID
+                                </p>
+                                <div
+                                  class="text-sm font-medium text-gray-800 dark:text-white/90"
+                                  x-text="eor?.project_id"
+                                ></div>
+                              </div>
+
+                              <div>
+                                <p
+                                  class="mb-1 text-xs leading-normal text-gray-500 dark:text-gray-400"
+                                >
+                                  Workbook ID
+                                </p>
+                                <div
+                                  class="text-sm font-medium text-gray-800 dark:text-white/90"
+                                  x-text="eor?.workbook_id"
+                                ></div>
+                              </div>
+
+                              <div>
+                                <p
+                                  class="mb-1 text-xs leading-normal text-gray-500 dark:text-gray-400"
+                                >
+                                  Work Package
+                                </p>
+                                <div
+                                  class="text-sm font-medium text-gray-800 dark:text-white/90"
+                                  x-text="eor?.work_package"
+                                ></div>
+                              </div>
+
+                              <div>
+                                <p
+                                  class="mb-1 text-xs leading-normal text-gray-500 dark:text-gray-400"
+                                >
+                                  Deliverable(s) Reference
+                                </p>
+                                <div class="flex flex-col space-y-1">
+                                  <template
+                                    x-for="(component, index) in eor?.deliverables_reference"
+                                    :key="index"
+                                  >
+                                    <div
+                                      class="text-sm font-medium text-gray-800 dark:text-white/90"
+                                      x-text="component"
+                                    ></div>
+                                  </template>
+                                </div>
+                              </div>
+
+                              <div>
+                                <p
+                                  class="mb-1 text-xs leading-normal text-gray-500 dark:text-gray-400"
+                                >
+                                  Workbook Released Date
+                                </p>
+                                <div
+                                  class="text-sm font-medium text-gray-800 dark:text-white/90"
+                                  x-text="$formatDateToString(eor?.workbook_released_date)"
+                                ></div>
+                              </div>
+                            </div>
+
+                            <div class="space-y-4 lg:col-span-1">
+                              <div>
+                                <p
+                                  class="mb-1 text-xs leading-normal text-gray-500 dark:text-gray-400"
+                                >
+                                  CC Component(s)
+                                </p>
+                                <div class="flex flex-col space-y-1">
+                                  <template
+                                    x-for="(component, index) in eor?.cc_components"
+                                    :key="index"
+                                  >
+                                    <div
+                                      class="text-sm font-medium text-gray-800 dark:text-white/90"
+                                      x-text="component"
+                                    ></div>
+                                  </template>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div class="mt-6">
+                            <button
+                              class="shadow-theme-xs bg-brand-600 hover:bg-brand-800 mb-2 inline-flex w-full items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white transition md:mb-0 md:w-auto"
+                              @click="openEorModal()"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="#ffffff"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                              >
+                                <path
+                                  d="M20 14.66V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5.34"
+                                ></path>
+                                <polygon
+                                  points="18 2 22 6 12 16 8 16 8 12 18 2"
+                                ></polygon>
+                              </svg>
+                              Edit EOR
+                            </button>
+                            <button
+                              class="shadow-theme-xs mb-2 inline-flex w-full items-center gap-2 rounded-lg bg-red-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-red-800 md:mb-0 md:w-auto"
+                              @click="deleteEOR()"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="#ffffff"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                              >
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path
+                                  d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+                                ></path>
+                                <line x1="10" y1="11" x2="10" y2="17"></line>
+                                <line x1="14" y1="11" x2="14" y2="17"></line>
+                              </svg>
+                              Hapus EOR
+                            </button>
+                            <button
+                              class="shadow-theme-xs bg-warning-600 hover:bg-warning-800 mb-2 inline-flex w-full items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white transition md:mb-0 md:w-auto"
+                              @click="window.open('/review_report_sign.html', '_self')"
+                              x-show="eor?.eor_reviewreport !== null"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="#ffffff"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                              >
+                                <path
+                                  d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z"
+                                />
+                                <path d="M14 3v5h5M16 13H8M16 17H8M10 9H8" />
+                              </svg>
+                              Buka Review Report
+                            </button>
+                            <button
+                              class="shadow-theme-xs bg-warning-600 hover:bg-warning-800 mb-2 inline-flex w-full items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white transition md:mb-0 md:w-auto"
+                              @click="window.open('/review_report.html', '_self')"
+                              x-show="eor?.eor_reviewreport === null"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="#ffffff"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                              >
+                                <path
+                                  d="M20 11.08V8l-6-6H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h6"
+                                />
+                                <path d="M14 3v5h5M18 21v-6M15 18h6" />
+                              </svg>
+                              Buat Review Report
+                            </button>
+                            <button
+                              class="shadow-theme-xs mb-2 inline-flex w-full items-center gap-2 rounded-lg bg-red-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-red-800 md:mb-0 md:w-auto"
+                              @click="deleteEORReviewReport()"
+                              x-show="eor?.eor_reviewreport !== null"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="#ffffff"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                              >
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path
+                                  d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+                                ></path>
+                                <line x1="10" y1="11" x2="10" y2="17"></line>
+                                <line x1="14" y1="11" x2="14" y2="17"></line>
+                              </svg>
+                              Hapus Review Report
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="mb-6">
+                    <include
+                      src="./partials/table/table-component-review.html"
+                    />
+                  </div>
+
+                  <div class="mb-6">
+                    <include
+                      src="./partials/table/table-schedule-review.html"
+                    />
+                  </div>
+
+                  <div class="mb-6">
+                    <include src="./partials/table/table-eor-analysis.html" />
+                  </div>
+
+                  <div
+                    class="mb-6"
+                    x-show="eor?.work_package === 'ATE' || eor?.work_package === 'AVA'"
+                  >
+                    <div
+                      class="mb-6 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]"
+                    >
+                      <div
+                        class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between"
+                      >
+                        <div>
+                          <h4
+                            class="mb-6 text-lg font-semibold text-gray-800 dark:text-white/90"
+                          >
+                            Test Plan
+                          </h4>
+
+                          <button
+                            class="shadow-theme-xs mb-2 inline-flex w-full items-center gap-2 rounded-lg bg-red-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-red-800 md:mb-0 md:w-auto"
+                          >
+                            <svg
+                              class="fill-current"
+                              width="20"
+                              height="20"
+                              viewBox="0 0 20 20"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                fill-rule="evenodd"
+                                clip-rule="evenodd"
+                                d="M9.77692 3.24224C9.91768 3.17186 10.0834 3.17186 10.2241 3.24224L15.3713 5.81573L10.3359 8.33331C10.1248 8.43888 9.87626 8.43888 9.66512 8.33331L4.6298 5.81573L9.77692 3.24224ZM3.70264 7.0292V13.4124C3.70264 13.6018 3.80964 13.775 3.97903 13.8597L9.25016 16.4952L9.25016 9.7837C9.16327 9.75296 9.07782 9.71671 8.99432 9.67496L3.70264 7.0292ZM10.7502 16.4955V9.78396C10.8373 9.75316 10.923 9.71683 11.0067 9.67496L16.2984 7.0292V13.4124C16.2984 13.6018 16.1914 13.775 16.022 13.8597L10.7502 16.4955ZM9.41463 17.4831L9.10612 18.1002C9.66916 18.3817 10.3319 18.3817 10.8949 18.1002L16.6928 15.2013C17.3704 14.8625 17.7984 14.17 17.7984 13.4124V6.58831C17.7984 5.83076 17.3704 5.13823 16.6928 4.79945L10.8949 1.90059C10.3319 1.61908 9.66916 1.61907 9.10612 1.90059L9.44152 2.57141L9.10612 1.90059L3.30823 4.79945C2.63065 5.13823 2.20264 5.83076 2.20264 6.58831V13.4124C2.20264 14.17 2.63065 14.8625 3.30823 15.2013L9.10612 18.1002L9.41463 17.4831Z"
+                                fill=""
+                              />
+                            </svg>
+                            Generate Test Plan Review Report
+                          </button>
+
+                          <div class="mt-6 mb-6">
+                            <include src="./partials/tpr.html" />
+                          </div>
+
+                          <div>
+                            <div class="mb-6">
+                              <include
+                                src="./partials/table/table-test-plan-component-review.html"
+                              />
+                            </div>
+
+                            <div>
+                              <include
+                                src="./partials/table/table-test-plan-analysis.html"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- ====== Form Elements Section End -->
+          </div>
+        </main>
+        <!-- ===== Main Content End ===== -->
+      </div>
+      <!-- ===== Content Area End ===== -->
+    </div>
+    <!-- ===== Page Wrapper End ===== -->
+    <div x-show="isOpenEorModal === true" x-cloak>
+      <include src="./partials/eor-modal.html" />
+    </div>
+  </body>
+</html>

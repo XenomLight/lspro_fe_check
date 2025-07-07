@@ -1,0 +1,467 @@
+<script>
+  function eorFormHandler() {
+    return {
+      eorFormSubmitting: false,
+      eorFormShowResult: false,
+      async eorSubmitForm(event) {
+        event.preventDefault();
+
+        this.eorFormErrors = {};
+
+        if (!this.eorModelProjectId || this.eorModelProjectId.trim() === "") {
+          this.eorFormErrors.eorModelProjectId = "Project ID harus diisi";
+        }
+
+        if (!this.eorModelWorkbookId || this.eorModelWorkbookId.trim() === "") {
+          this.eorFormErrors.eorModelWorkbookId = "Workbook ID harus diisi";
+        }
+
+        if (
+          !this.eorModelWorkPackage ||
+          this.eorModelWorkPackage.trim() === ""
+        ) {
+          this.eorFormErrors.eorModelWorkPackage = "Work Package harus dipilih";
+        }
+
+        if (
+          window.parseTextToJSONArray(this.eorModelDeliverablesReference)
+            .length === 0
+        ) {
+          this.eorFormErrors.eorModelDeliverablesReference =
+            "Deliverables Reference harus diisi";
+        }
+
+        if (
+          window.parseTextToJSONArray(this.eorModelCcComponents).length === 0
+        ) {
+          this.eorFormErrors.eorModelCcComponents = "CC Components harus diisi";
+        }
+
+        if (
+          !this.eorModelWorkbookReleasedDate ||
+          this.eorModelWorkbookReleasedDate.trim() === ""
+        ) {
+          this.eorFormErrors.eorModelWorkbookReleasedDate =
+            "EOR Workbook Released Date harus diisi";
+        }
+
+        if (Object.keys(this.eorFormErrors).length > 0) return;
+
+        this.eorFormSubmitting = true;
+
+        if (!this.isEditingEor) {
+          try {
+            const res = await fetch(`${window.apiHost}/eor/`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                project_id: this.eorModelProjectId,
+                workbook_id: this.eorModelWorkbookId,
+                work_package: this.eorModelWorkPackage,
+                deliverables_reference: window.parseTextToJSONArray(
+                  this.eorModelDeliverablesReference,
+                ),
+                cc_components: window.parseTextToJSONArray(
+                  this.eorModelCcComponents,
+                ),
+                workbook_released_date: this.eorModelWorkbookReleasedDate,
+                toe_id: this.selectedToe.id,
+              }),
+            });
+
+            const result = await res.json();
+
+            if (!res.ok) {
+              throw new Error(result.message || "Terjadi kesalahan.");
+              return;
+            }
+
+            await window.swal.fire({
+              text: "EOR berhasil dibuat!",
+              icon: "success",
+            });
+
+            this.eorFormSubmitting = false;
+            this.eorFormShowResult = true;
+
+            location.reload();
+          } catch (error) {
+            await window.swal.fire({
+              text: `EOR gagal dibuat!: ${error.message || "Terjadi kesalahan."}`,
+              icon: "error",
+            });
+            this.eorFormSubmitting = false;
+            this.eorFormShowResult = true;
+
+            location.reload();
+          }
+        } else {
+          try {
+            const id = sessionStorage.getItem("selectedEORId");
+            const res = await fetch(`${window.apiHost}/eor/${id}`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                project_id: this.eorModelProjectId,
+                workbook_id: this.eorModelWorkbookId,
+                work_package: this.eorModelWorkPackage,
+                deliverables_reference: window.parseTextToJSONArray(
+                  this.eorModelDeliverablesReference,
+                ),
+                cc_components: window.parseTextToJSONArray(
+                  this.eorModelCcComponents,
+                ),
+                workbook_released_date: this.eorModelWorkbookReleasedDate,
+              }),
+            });
+
+            const result = await res.json();
+            if (!res.ok) {
+              throw new Error(result.message || "Terjadi kesalahan.");
+              return;
+            }
+
+            await window.swal.fire({
+              text: "EOR berhasil diedit!",
+              icon: "success",
+            });
+
+            this.eorFormSubmitting = false;
+            this.eorFormShowResult = true;
+
+            location.reload();
+          } catch (error) {
+            await window.swal.fire({
+              text: `EOR gagal diedit!: ${error.message || "Terjadi kesalahan."}`,
+              icon: "error",
+            });
+
+            this.eorFormSubmitting = false;
+            this.eorFormShowResult = true;
+
+            location.reload();
+          }
+        }
+      },
+    };
+  }
+</script>
+
+<div
+  class="fixed inset-0 z-1000 flex items-center justify-center overflow-y-auto p-5"
+  x-data="eorFormHandler"
+  x-show="isOpenEorModal"
+  x-init="isOpenEorModal = false"
+  x-cloak
+>
+  <div
+    class="modal-close-btn fixed inset-0 h-full w-full bg-gray-400/50 backdrop-blur-[32px]"
+  ></div>
+  <div
+    class="no-scrollbar relative w-full max-w-[700px] overflow-y-auto rounded-3xl bg-white p-4 lg:p-11 dark:bg-gray-900"
+  >
+    <div x-show="eorFormSubmitting === false && eorFormShowResult === false">
+      <button
+        class="transition-color absolute top-5 right-5 z-999 flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:bg-gray-700 dark:bg-white/[0.05] dark:text-gray-400 dark:hover:bg-white/[0.07] dark:hover:text-gray-300"
+        @click="isOpenEorModal = false"
+        x-show="eorFormSubmitting === false"
+      >
+        <svg
+          class="fill-current"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            fill-rule="evenodd"
+            clip-rule="evenodd"
+            d="M6.04289 16.5418C5.65237 16.9323 5.65237 17.5655 6.04289 17.956C6.43342 18.3465 7.06658 18.3465 7.45711 17.956L11.9987 13.4144L16.5408 17.9565C16.9313 18.347 17.5645 18.347 17.955 17.9565C18.3455 17.566 18.3455 16.9328 17.955 16.5423L13.4129 12.0002L17.955 7.45808C18.3455 7.06756 18.3455 6.43439 17.955 6.04387C17.5645 5.65335 16.9313 5.65335 16.5408 6.04387L11.9987 10.586L7.45711 6.04439C7.06658 5.65386 6.43342 5.65386 6.04289 6.04439C5.65237 6.43491 5.65237 7.06808 6.04289 7.4586L10.5845 12.0002L6.04289 16.5418Z"
+            fill=""
+          />
+        </svg>
+      </button>
+      <div class="px-2 pr-14">
+        <div
+          class="mb-2 text-2xl font-semibold text-gray-800 dark:text-white/90"
+          x-text="isEditingEor ? 'Edit EOR' : 'Tambah EOR'"
+        ></div>
+        <div class="mb-6 text-sm text-gray-500 lg:mb-7 dark:text-gray-400">
+          Masukkan detail EOR
+        </div>
+      </div>
+      <form class="flex flex-col" @submit="eorSubmitForm">
+        <div class="custom-scrollbar h-[350px] overflow-y-auto px-2">
+          <div>
+            <div class="grid grid-cols-1 gap-x-6 gap-y-5">
+              <div>
+                <label
+                  class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
+                >
+                  Project ID
+                </label>
+                <input
+                  type="text"
+                  x-model="eorModelProjectId"
+                  placeholder="Masukkan EOR Project ID"
+                  :class="[
+                    'w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none',
+                    eorFormErrors.eorModelProjectId ? 'border border-red-500 focus:ring-red-500/10' : 'border border-gray-300 focus:ring-gray-500/10',
+                    'dark:bg-gray-900 dark:text-white/90 dark:border-gray-700'
+                  ]"
+                />
+                <p
+                  x-show="eorFormErrors.eorModelProjectId"
+                  class="mt-1.5 text-xs text-red-500"
+                  x-text="eorFormErrors.eorModelProjectId"
+                ></p>
+              </div>
+
+              <div>
+                <label
+                  class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
+                >
+                  Workbook ID
+                </label>
+                <input
+                  type="text"
+                  x-model="eorModelWorkbookId"
+                  placeholder="Masukkan EOR Workbook ID"
+                  :class="[
+                    'w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none',
+                    eorFormErrors.eorModelWorkbookId ? 'border border-red-500 focus:ring-red-500/10' : 'border border-gray-300 focus:ring-gray-500/10',
+                    'dark:bg-gray-900 dark:text-white/90 dark:border-gray-700'
+                  ]"
+                />
+                <p
+                  x-show="eorFormErrors.eorModelWorkbookId"
+                  class="mt-1.5 text-xs text-red-500"
+                  x-text="eorFormErrors.eorModelWorkbookId"
+                ></p>
+              </div>
+
+              <div x-show="isEditingEor === false">
+                <label
+                  class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
+                >
+                  Work Package
+                </label>
+                <div class="relative z-20 bg-transparent">
+                  <select
+                    x-model="eorModelWorkPackage"
+                    class="w-full appearance-none rounded-lg px-4 py-2.5 text-sm focus:outline-none"
+                    :class="[
+                      eorFormErrors.eorModelWorkPackage ? 'border border-red-500 focus:ring-red-500/10' : 'border border-gray-300 focus:ring-gray-500/10',
+                      'dark:bg-gray-900 dark:text-white/90 dark:border-gray-700'
+                    ]"
+                  >
+                    <option
+                      value=""
+                      disabled
+                      hidden
+                      class="text-gray-700 dark:bg-gray-900 dark:text-gray-400"
+                    >
+                      Pilih Work Package
+                    </option>
+                    <option
+                      value="ASE"
+                      class="text-gray-700 dark:bg-gray-900 dark:text-gray-400"
+                    >
+                      ASE
+                    </option>
+                    <option
+                      value="AGD"
+                      class="text-gray-700 dark:bg-gray-900 dark:text-gray-400"
+                    >
+                      AGD
+                    </option>
+                    <option
+                      value="ALC"
+                      class="text-gray-700 dark:bg-gray-900 dark:text-gray-400"
+                    >
+                      ALC
+                    </option>
+                    <option
+                      value="ATE"
+                      class="text-gray-700 dark:bg-gray-900 dark:text-gray-400"
+                    >
+                      ATE
+                    </option>
+                    <option
+                      value="AVA"
+                      class="text-gray-700 dark:bg-gray-900 dark:text-gray-400"
+                    >
+                      AVA
+                    </option>
+                  </select>
+                  <span
+                    class="pointer-events-none absolute top-1/2 right-4 z-30 -translate-y-1/2 text-gray-500 dark:text-gray-400"
+                  >
+                    <svg
+                      class="stroke-current"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M4.79175 7.396L10.0001 12.6043L15.2084 7.396"
+                        stroke=""
+                        stroke-width="1.5"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </span>
+                </div>
+                <p
+                  x-show="eorFormErrors.eorModelWorkPackage"
+                  class="mt-1.5 text-xs text-red-500"
+                  x-text="eorFormErrors.eorModelWorkPackage"
+                ></p>
+              </div>
+
+              <div>
+                <label
+                  class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
+                >
+                  Deliverable(s) Reference
+                </label>
+                <textarea
+                  x-model="eorModelDeliverablesReference"
+                  placeholder="Masukkan Deliverable(s) Reference. Satu baris untuk satu item"
+                  type="text"
+                  rows="6"
+                  :class="[
+                  'w-full rounded-lg px-4 py-2.5 text-sm shadow-theme-xs bg-transparent focus:outline-none',
+                  eorFormErrors.eorModelDeliverablesReference 
+                    ? 'border border-red-500 focus:border-red-500 focus:ring-red-500/10' 
+                    : 'border border-gray-300 focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800',
+                  'dark:bg-gray-900 dark:text-white/90 dark:border-gray-700 placeholder:text-gray-400 dark:placeholder:text-white/30'
+                ]"
+                ></textarea>
+                <p
+                  x-show="eorFormErrors.eorModelDeliverablesReference"
+                  class="mt-1.5 text-xs text-red-500"
+                  x-text="eorFormErrors.eorModelDeliverablesReference"
+                ></p>
+              </div>
+
+              <div>
+                <label
+                  class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
+                >
+                  CC Component(s)
+                </label>
+                <textarea
+                  x-model="eorModelCcComponents"
+                  placeholder="Masukkan CC Component(s). Satu baris untuk satu item"
+                  type="text"
+                  rows="6"
+                  :class="[
+                  'w-full rounded-lg px-4 py-2.5 text-sm shadow-theme-xs bg-transparent focus:outline-none',
+                  eorFormErrors.eorModelCcComponents 
+                    ? 'border border-red-500 focus:border-red-500 focus:ring-red-500/10' 
+                    : 'border border-gray-300 focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800',
+                  'dark:bg-gray-900 dark:text-white/90 dark:border-gray-700 placeholder:text-gray-400 dark:placeholder:text-white/30'
+                ]"
+                ></textarea>
+                <p
+                  x-show="eorFormErrors.eorModelCcComponents"
+                  class="mt-1.5 text-xs text-red-500"
+                  x-text="eorFormErrors.eorModelCcComponents"
+                ></p>
+              </div>
+
+              <div>
+                <label
+                  class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
+                >
+                  EOR Released Date
+                </label>
+
+                <div class="relative">
+                  <input
+                    x-model="eorModelWorkbookReleasedDate"
+                    type="date"
+                    placeholder="Select date"
+                    :class="[
+                    'w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none',
+                    eorFormErrors.eorModelWorkbookReleasedDate ? 'border border-red-500 focus:ring-red-500/10' : 'border border-gray-300 focus:ring-gray-500/10',
+                    'dark:bg-gray-900 dark:text-white/90 dark:border-gray-700'
+                  ]"
+                    onclick="this.showPicker()"
+                  />
+                  <span
+                    class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-gray-500 dark:text-gray-400"
+                  >
+                    <svg
+                      class="fill-current"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        clip-rule="evenodd"
+                        d="M6.66659 1.5415C7.0808 1.5415 7.41658 1.87729 7.41658 2.2915V2.99984H12.5833V2.2915C12.5833 1.87729 12.919 1.5415 13.3333 1.5415C13.7475 1.5415 14.0833 1.87729 14.0833 2.2915V2.99984L15.4166 2.99984C16.5212 2.99984 17.4166 3.89527 17.4166 4.99984V7.49984V15.8332C17.4166 16.9377 16.5212 17.8332 15.4166 17.8332H4.58325C3.47868 17.8332 2.58325 16.9377 2.58325 15.8332V7.49984V4.99984C2.58325 3.89527 3.47868 2.99984 4.58325 2.99984L5.91659 2.99984V2.2915C5.91659 1.87729 6.25237 1.5415 6.66659 1.5415ZM6.66659 4.49984H4.58325C4.30711 4.49984 4.08325 4.7237 4.08325 4.99984V6.74984H15.9166V4.99984C15.9166 4.7237 15.6927 4.49984 15.4166 4.49984H13.3333H6.66659ZM15.9166 8.24984H4.08325V15.8332C4.08325 16.1093 4.30711 16.3332 4.58325 16.3332H15.4166C15.6927 16.3332 15.9166 16.1093 15.9166 15.8332V8.24984Z"
+                        fill=""
+                      />
+                    </svg>
+                  </span>
+                </div>
+                <p
+                  x-show="eorFormErrors.eorModelWorkbookReleasedDate"
+                  class="mt-1.5 text-xs text-red-500"
+                  x-text="eorFormErrors.eorModelWorkbookReleasedDate"
+                ></p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mt-6 flex items-center gap-3 px-2 lg:justify-end">
+          <button
+            type="button"
+            @click="isOpenEorModal = false"
+            class="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:w-auto dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03]"
+          >
+            Batal
+          </button>
+          <template x-if="!isEditingEor">
+            <button
+              type="submit"
+              class="bg-success-500 hover:bg-success-600 flex w-full justify-center rounded-lg px-4 py-2.5 text-sm font-medium text-white sm:w-auto"
+            >
+              Tambah EOR
+            </button>
+          </template>
+          <template x-if="isEditingEor">
+            <button
+              type="submit"
+              class="bg-brand-500 hover:bg-brand-600 flex w-full justify-center rounded-lg px-4 py-2.5 text-sm font-medium text-white sm:w-auto"
+            >
+              Simpan EOR
+            </button>
+          </template>
+        </div>
+      </form>
+    </div>
+    <!-- Loading -->
+    <div
+      x-show="eorFormSubmitting && eorFormShowResult === false"
+      class="text-center text-gray-600"
+    >
+      Loading...
+    </div>
+  </div>
+</div>

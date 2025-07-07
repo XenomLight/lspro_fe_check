@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0"
+    />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Review Report | LSPro BSSN</title>
+
+    <style>
+      [x-cloak] {
+        display: none !important;
+      }
+      input[type="date"]::-webkit-calendar-picker-indicator {
+        display: none;
+      }
+      input[type="date"]::-moz-calendar-picker-indicator {
+        display: none;
+      }
+    </style>
+
+    <script defer>
+      let token;
+      let reviewerData;
+      document.addEventListener("alpine:init", () => {
+        if (window.isLoggedIn()) {
+          token = localStorage.getItem("token");
+          reviewerData = JSON.parse(localStorage.getItem("reviewer"));
+        } else {
+          token = null;
+          window.location.href = "/login.html";
+        }
+      });
+      document.addEventListener("alpine:init", () => {
+        Alpine.data("ReviewReportSignPagesInit", () => ({
+          // old properties
+          page: "reviewreportsign",
+          darkMode: false,
+          sidebarToggle: false,
+
+          // new properties
+          toe: null,
+          eor: null,
+          isLoading: true,
+          isOpenManualSubmitForm: false,
+          isLoadingPDFPreview: true,
+          isReviewerIsSigner: false,
+          isValidToSign: false,
+          signMessage:
+            "Anda bukan Signer yang ditunjuk untuk menandatangani dokumen ini",
+          pdfLink: null,
+          reviewers: [],
+          eorReviewReportSignModelSignedFile: null,
+          eorReviewReportSignFormError: {},
+          eorReviewReportSignFormSubmitting: false,
+          init() {
+            this.isLoading = true;
+
+            const id = sessionStorage.getItem("selectedEORId");
+            if (!id) {
+              console.error("ID EOR tidak ditemukan di sessionStorage");
+              this.isLoading = false;
+              this.isLoadingPDFPreview = false;
+              this.pdfLink = null;
+              this.isReviewerIsSigner = false;
+              this.isValidToSign = false;
+              this.signMessage = "Invalid";
+              return;
+            }
+
+            const toeIdParam = sessionStorage.getItem("toeId");
+            if (!toeIdParam) {
+              console.error("TOE id tidak ditemukan di sessionStorage");
+              this.isLoading = false;
+              this.isLoadingPDFPreview = false;
+              this.pdfLink = null;
+              this.isReviewerIsSigner = false;
+              this.isValidToSign = false;
+              this.signMessage = "Invalid";
+              return;
+            }
+
+            try {
+              fetch(`${window.apiHost}/toe/${toeIdParam}`, {
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+              })
+                .then((res) => {
+                  if (!res.ok) throw new Error("Gagal fetch TOE");
+                  return res.json();
+                })
+                .then((data) => {
+                  this.toe = data.data;
+                })
+                .catch((error) => {
+                  console.error("Error:", error);
+                  this.isLoading = false;
+                  this.isLoadingPDFPreview = false;
+                  this.pdfLink = null;
+                  this.isReviewerIsSigner = false;
+                  this.isValidToSign = false;
+                  this.signMessage = "Invalid";
+                });
+
+              fetch(`${window.apiHost}/eor/${id}`, {
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+              })
+                .then((res) => {
+                  if (!res.ok) throw new Error("Gagal fetch EOR");
+                  return res.json();
+                })
+                .then(async (data) => {
+                  this.eor = data.data;
+
+                  if (this.eor.eor_reviewreport === null) {
+                    this.isLoading = false;
+                    this.pdfLink = null;
+                    this.isLoadingPDFPreview = false;
+                    return;
+                  }
+
+                  const rr = this.eor.eor_reviewreport;
+                  const stringPdfLink = `${window.apiHost}/review-report/${rr.file.reduce((max, item) => (item.id > max.id ? item : max)).file_uuid}`;
+                  this.pdfLink = stringPdfLink;
+
+                  // 1. Check RIGHT_SIGNER (array)
+                  const rightSigner = rr.right_signer?.find(
+                    (r) => r.id === reviewerData.id,
+                  );
+                  if (rightSigner) {
+                    this.isReviewerIsSigner = true;
+                    if (!rightSigner.has_sign) {
+                      this.isValidToSign = true;
+                      this.signMessage =
+                        "Silakan tandatangani dokumen ini sebagai Auditor";
+                    } else {
+                      this.signMessage =
+                        "Anda sudah menandatangani dokumen ini";
+                    }
+                  } else if (rr.lead_right_signer?.id === reviewerData.id) {
+                    this.isReviewerIsSigner = true;
+                    if (!rr.lead_right_signer.has_sign) {
+                      const allRightSigned = rr.right_signer?.every(
+                        (r) => r.has_sign === true,
+                      );
+                      if (allRightSigned) {
+                        this.isValidToSign = true;
+                        this.signMessage =
+                          "Semua Auditor telah menandatangani. Silakan Anda tanda tangani dokumen ini sebagai Lead Auditor";
+                      } else {
+                        this.signMessage =
+                          "Semua Auditor belum menandatangani dokumen ini";
+                      }
+                    } else {
+                      this.signMessage =
+                        "Anda sudah menandatangani dokumen ini";
+                    }
+                  } else if (rr.middle_signer?.id === reviewerData.id) {
+                    this.isReviewerIsSigner = true;
+                    if (!rr.middle_signer.has_sign) {
+                      const allRightSigned = rr.right_signer?.every(
+                        (r) => r.has_sign === true,
+                      );
+                      const leadRightSigned =
+                        rr.lead_right_signer?.has_sign === true;
+                      if (allRightSigned && leadRightSigned) {
+                        this.isValidToSign = true;
+                        this.signMessage =
+                          "Auditor dan Lead Auditor telah menandatangani. Silakan Anda tandatangani dokumen ini sebagai Manajer Teknis";
+                      } else {
+                        this.signMessage =
+                          "Signer sebelumnya (Auditor dan Lead Auditor) belum seluruhnya menandatangani dokumen ini";
+                      }
+                    } else {
+                      this.signMessage =
+                        "Anda sudah menandatangani dokumen ini";
+                    }
+                  } else if (rr.left_signer?.id === reviewerData.id) {
+                    this.isReviewerIsSigner = true;
+                    if (!rr.left_signer.has_sign) {
+                      const allRightSigned = rr.right_signer?.every(
+                        (r) => r.has_sign === true,
+                      );
+                      const leadRightSigned =
+                        rr.lead_right_signer?.has_sign === true;
+                      const middleSigned = rr.middle_signer?.has_sign === true;
+
+                      if (allRightSigned && leadRightSigned && middleSigned) {
+                        this.isValidToSign = true;
+                        this.signMessage =
+                          "Auditor, Lead Auditor, dan Manajer Teknis telah menandatangani. Silakan Anda tandatangani dokumen ini sebagai Ketua Tim Sertifikasi";
+                      } else {
+                        this.signMessage =
+                          "Signer sebelumnya (Auditor, Lead Auditor, dan Manajer Teknis) belum seluruhnya menandatangani dokumen ini";
+                      }
+                    } else {
+                      this.signMessage =
+                        "Anda sudah menandatangani dokumen ini";
+                    }
+                  }
+
+                  this.isLoadingPDFPreview = false;
+                  this.isLoading = false;
+                })
+                .catch((error) => {
+                  console.error("Error:", error);
+                  this.isLoading = false;
+                  this.isLoadingPDFPreview = false;
+                  this.pdfLink = null;
+                  this.isReviewerIsSigner = false;
+                  this.isValidToSign = false;
+                  this.signMessage = "Invalid";
+                });
+            } catch (error) {
+              console.error("Error:", error);
+              this.isLoading = false;
+              this.isLoadingPDFPreview = false;
+            }
+          },
+          async eorReviewReportSignFormSubmit() {
+            this.eorReviewReportSignFormError = {};
+
+            if (!this.eorReviewReportSignModelSignedFile) {
+              this.eorReviewReportSignFormError.eorReviewReportSignModelSignedFile =
+                "File harus diisi";
+            }
+
+            if (Object.keys(this.eorReviewReportSignFormError).length > 0)
+              return;
+
+            this.eorReviewReportSignFormSubmitting = true;
+
+            try {
+              const id = sessionStorage.getItem("selectedEORId");
+
+              const formData = new FormData();
+              formData.append("file", this.eorReviewReportSignModelSignedFile);
+
+              const res = await fetch(
+                `${window.apiHost}/eor/${id}/review-report/sign`,
+                {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: formData,
+                },
+              );
+
+              const result = await res.json();
+              if (!res.ok) {
+                await window.swal.fire({
+                  text: `Gagal mengupload dan menandatangani: ${result.message || "Terjadi kesalahan."}`,
+                  icon: "error",
+                });
+                return;
+              }
+
+              await window.swal.fire({
+                text: "EOR Review Report berhasil diupload dan ditandatangani!",
+                icon: "success",
+              });
+              window.location.href = "/eor.html";
+            } catch (error) {
+              await window.swal.fire({
+                text:
+                  "EOR Review Report gagal diupload dan ditandatangani! " +
+                  error.message,
+                icon: "error",
+              });
+              window.location.reload();
+            }
+          },
+        }));
+      });
+    </script>
+  </head>
+  <body
+    x-data="ReviewReportSignPagesInit"
+    x-init="
+         darkMode = JSON.parse(localStorage.getItem('darkMode'));
+         $watch('darkMode', value => localStorage.setItem('darkMode', JSON.stringify(value)));
+         sidebarToggle = JSON.parse(localStorage.getItem('sidebarToggle'));
+         $watch('sidebarToggle', value => localStorage.setItem('sidebarToggle', JSON.stringify(value)));
+         "
+    :class="{'dark bg-gray-900': darkMode === true}"
+  >
+    <!-- ===== Page Wrapper Start ===== -->
+    <div class="flex h-screen overflow-hidden">
+      <!-- ===== Sidebar Start ===== -->
+      <include src="./partials/sidebar.html"></include>
+      <!-- ===== Sidebar End ===== -->
+
+      <!-- ===== Content Area Start ===== -->
+      <div
+        class="relative flex flex-1 flex-col overflow-x-hidden overflow-y-auto"
+      >
+        <!-- ===== Header Start ===== -->
+        <include src="./partials/header.html" />
+        <!-- ===== Header End ===== -->
+
+        <!-- ===== Main Content Start ===== -->
+        <main>
+          <div class="mx-auto max-w-(--breakpoint-2xl) p-6">
+            <!-- Breadcrumb Start -->
+            <div>
+              <div
+                class="mb-6 flex flex-wrap items-center justify-between gap-3"
+              >
+                <nav>
+                  <ol class="flex items-center gap-1.5">
+                    <li>
+                      <a
+                        class="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400"
+                        href="toe.html"
+                      >
+                        <span x-text="toe?.title"></span>
+                        <svg
+                          class="stroke-current"
+                          width="17"
+                          height="16"
+                          viewBox="0 0 17 16"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M6.0765 12.667L10.2432 8.50033L6.0765 4.33366"
+                            stroke=""
+                            stroke-width="1.2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                          />
+                        </svg>
+                      </a>
+                    </li>
+                    <li>
+                      <a
+                        class="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400"
+                        href="eor.html"
+                      >
+                        <span
+                          x-text="`[${eor?.work_package}] ${eor?.workbook_id}`"
+                        ></span>
+                        <svg
+                          class="stroke-current"
+                          width="17"
+                          height="16"
+                          viewBox="0 0 17 16"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M6.0765 12.667L10.2432 8.50033L6.0765 4.33366"
+                            stroke=""
+                            stroke-width="1.2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                          />
+                        </svg>
+                      </a>
+                    </li>
+                    <li>
+                      <h2
+                        class="text-2xl font-semibold text-gray-800 dark:text-white/90"
+                      >
+                        Review Report
+                      </h2>
+                    </li>
+                  </ol>
+                </nav>
+              </div>
+            </div>
+            <!-- Breadcrumb End -->
+
+            <!-- ====== Form Elements Section Start -->
+            <div>
+              <div
+                class="mb-6 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]"
+              >
+                <div
+                  class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between"
+                >
+                  <p
+                    class="p-4 text-gray-500 dark:text-gray-400"
+                    x-show="eorReviewReportSignFormSubmitting"
+                  >
+                    Submitting...
+                  </p>
+                  <div
+                    class="w-full"
+                    x-show="!eorReviewReportSignFormSubmitting"
+                  >
+                    <h4
+                      class="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90"
+                    >
+                      Review Report
+                    </h4>
+                    <div
+                      class="mb-3 space-y-1 text-gray-700 dark:text-white/90"
+                    >
+                      <!-- RIGHT SIGNER (Auditor - bisa lebih dari 1) -->
+                      <template
+                        x-for="(signer, idx) in eor?.eor_reviewreport?.right_signer || []"
+                        :key="signer.id"
+                      >
+                        <div class="grid grid-cols-[180px_1fr] gap-2">
+                          <span x-text="'Auditor ' + (idx + 1)"></span>
+                          <span
+                            x-text="signer.name + ' - ' + (signer.has_sign ? 'Sudah TTE' : 'Belum TTE')"
+                          ></span>
+                        </div>
+                      </template>
+
+                      <!-- LEAD RIGHT SIGNER (Lead Auditor) -->
+                      <template x-if="eor?.eor_reviewreport?.lead_right_signer">
+                        <div class="grid grid-cols-[180px_1fr] gap-2">
+                          <span>Lead Auditor</span>
+                          <span
+                            x-text="eor.eor_reviewreport.lead_right_signer.name + ' - ' + (eor.eor_reviewreport.lead_right_signer.has_sign ? 'Sudah TTE' : 'Belum TTE')"
+                          ></span>
+                        </div>
+                      </template>
+
+                      <!-- MIDDLE SIGNER (Manajer Teknis) -->
+                      <template x-if="eor?.eor_reviewreport?.middle_signer">
+                        <div class="grid grid-cols-[180px_1fr] gap-2">
+                          <span>Manajer Teknis</span>
+                          <span
+                            x-text="eor.eor_reviewreport.middle_signer.name + ' - ' + (eor.eor_reviewreport.middle_signer.has_sign ? 'Sudah TTE' : 'Belum TTE')"
+                          ></span>
+                        </div>
+                      </template>
+
+                      <!-- LEFT SIGNER (Ketua Tim Sertifikasi) -->
+                      <template x-if="eor?.eor_reviewreport?.left_signer">
+                        <div class="grid grid-cols-[180px_1fr] gap-2">
+                          <span>Ketua Tim Sertifikasi</span>
+                          <span
+                            x-text="eor.eor_reviewreport.left_signer.name + ' - ' + (eor.eor_reviewreport.left_signer.has_sign ? 'Sudah TTE' : 'Belum TTE')"
+                          ></span>
+                        </div>
+                      </template>
+                    </div>
+
+                    <template x-if="isLoadingPDFPreview">
+                      <p class="p-4 text-gray-500 dark:text-gray-400">
+                        Loading Review Report PDF...
+                      </p>
+                    </template>
+                    <template x-if="!isLoadingPDFPreview && pdfLink === null">
+                      <p class="p-4 text-gray-500 dark:text-gray-400">
+                        Error Loading Review Report PDF
+                      </p>
+                    </template>
+
+                    <template x-if="!isLoadingPDFPreview && pdfLink !== null">
+                      <iframe
+                        class="block w-full rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-800"
+                        style="height: 550px"
+                        :src="pdfLink"
+                        allowfullscreen
+                      ></iframe>
+                    </template>
+
+                    <div class="mt-8">
+                      <div>
+                        <p
+                          class="text-gray-500 dark:text-gray-400"
+                          x-text="signMessage"
+                        ></p>
+                      </div>
+                      <div x-show="isValidToSign" class="mt-8">
+                        <div>
+                          <label
+                            class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
+                          >
+                            Upload File Review Report yang telah ditandatangani
+                          </label>
+                        </div>
+
+                        <div
+                          class="mt-2 flex flex-col items-center gap-1 xl:flex-row"
+                        >
+                          <!-- Input File -->
+                          <div class="w-full xl:w-[275px]">
+                            <input
+                              type="file"
+                              @click="eorReviewReportSignModelSignedFile = null; $event.target.value = null"
+                              @change="eorReviewReportSignModelSignedFile = $event.target.files[0]"
+                              placeholder="Pilih file"
+                              class="focus:border-ring-brand-300 shadow-theme-xs focus:file:ring-brand-300 h-10 w-full overflow-hidden rounded-lg border border-gray-300 bg-transparent text-sm text-gray-500 transition-colors file:mr-5 file:border-collapse file:cursor-pointer file:rounded-l-lg file:border-0 file:border-r file:border-solid file:border-gray-200 file:bg-gray-50 file:py-3 file:pr-3 file:pl-3.5 file:text-xs file:text-gray-700 placeholder:text-gray-400 hover:file:bg-gray-100 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400 dark:text-white/90 dark:file:border-gray-800 dark:file:bg-white/[0.03] dark:file:text-gray-400 dark:placeholder:text-gray-400"
+                            />
+                          </div>
+
+                          <!-- Tombol Submit -->
+                          <button
+                            type="button"
+                            class="shadow-theme-xs bg-brand-600 hover:bg-brand-800 inline-flex w-full items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white transition xl:w-auto"
+                            @click="eorReviewReportSignFormSubmit();"
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="#ffffff"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                            >
+                              <polyline points="9 11 12 14 22 4"></polyline>
+                              <path
+                                d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"
+                              ></path>
+                            </svg>
+                            Upload dan Setujui Review Report
+                          </button>
+                        </div>
+                        <p
+                          x-show="eorReviewReportSignFormError.eorReviewReportSignModelSignedFile"
+                          class="mt-1.5 text-xs text-red-500"
+                          x-text="eorReviewReportSignFormError.eorReviewReportSignModelSignedFile"
+                        ></p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- ====== Form Elements Section End -->
+          </div>
+        </main>
+        <!-- ===== Main Content End ===== -->
+      </div>
+      <!-- ===== Content Area End ===== -->
+    </div>
+    <!-- ===== Page Wrapper End ===== -->
+  </body>
+</html>
