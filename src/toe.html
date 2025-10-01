@@ -22,17 +22,6 @@
     </style>
 
     <script defer>
-      let token;
-      let reviewerData;
-      document.addEventListener("alpine:init", () => {
-        if (window.isLoggedIn()) {
-          token = localStorage.getItem("token");
-          reviewerData = JSON.parse(localStorage.getItem("reviewer"));
-        } else {
-          token = null;
-          window.location.href = "/login.html";
-        }
-      });
       document.addEventListener("alpine:init", () => {
         Alpine.data("TOEPagesInit", () => ({
           // old properties
@@ -41,6 +30,8 @@
           sidebarToggle: false,
 
           // new properties
+          reviewerData: { role: '', id: null }, // <-- ADDED
+          token: '', // <-- ADDED
           isLoadingToe: true,
           isLoadingToeSuccess: true,
           isLoadingEor: false,
@@ -67,20 +58,36 @@
           eorModelWorkbookReleasedDate: "",
           eorFormErrors: {},
           init() {
+            // Get reviewerData from localStorage
+            const reviewer = localStorage.getItem("reviewer");
+            if (reviewer) {
+              this.reviewerData = JSON.parse(reviewer);
+            }
+            // If not logged in, redirect
+            if (!window.isLoggedIn()) {
+              window.location.href = "/login.html";
+              return;
+            }
+            // Get token
+            this.token = localStorage.getItem("token");
+
+            // Now use this.reviewerData and this.token
             this.toes = [];
             this.eors = [];
             this.reviewers = [];
             this.reviewerSelectedAsTOEReviewerIndex = [];
             let toeUrl;
-            if (reviewerData.role === "admin") {
+            if (this.reviewerData && this.reviewerData.role === "admin") {
               toeUrl = `${window.apiHost}/toe`;
+            } else if (this.reviewerData && this.reviewerData.id) {
+              toeUrl = `${window.apiHost}/toe?reviewer_id=${this.reviewerData.id}`;
             } else {
-              toeUrl = `${window.apiHost}/toe?reviewer_id=${reviewerData.id}`;
+              toeUrl = `${window.apiHost}/toe`;
             }
             fetch(toeUrl, {
               headers: {
                 "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
+                Authorization: `Bearer ${this.token}`,
               },
             })
               .then((res) => {
@@ -111,7 +118,7 @@
               const res = await fetch(`${window.apiHost}/reviewer`, {
                 headers: {
                   "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
+                  Authorization: `Bearer ${this.token}`,
                 },
               });
               if (!res.ok) throw new Error("Gagal fetch Reviewer");
@@ -144,7 +151,7 @@
               const res = await fetch(`${window.apiHost}/toe/${id}/eor`, {
                 headers: {
                   "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
+                  Authorization: `Bearer ${this.token}`,
                 },
               });
               if (!res.ok) throw new Error("Gagal fetch EOR");
@@ -215,7 +222,7 @@
                 method: "DELETE",
                 headers: {
                   "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
+                  Authorization: `Bearer ${this.token}`,
                 },
               });
 

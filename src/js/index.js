@@ -114,7 +114,7 @@ Alpine.magic('formatJSONArrayToInput', () => formatJSONArrayToInput)
 Alpine.magic('parseTextToJSONArray', () => parseTextToJSONArray)
 Alpine.magic('getFormattedDateTime', () => getFormattedDateTime)
 
-window.apiHost = "http://localhost:4000/api"; // tanpa trailing slash
+window.apiHost = "http://localhost:8000/api"; // tanpa trailing slash
 window.manajerTeknisReviewerId = 10;
 window.katimSertifikasiReviewerId = 2;
 

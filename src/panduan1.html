@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0"
+    />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Pengajuan Sertifikasi | LSPro BSSN</title>
+
+    <style>
+      [x-cloak] {
+        display: none !important;
+      }
+    </style>
+    <script
+      src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
+      defer
+    ></script>
+
+    <script defer>
+      document.addEventListener("alpine:init", () => {
+        Alpine.data("panduanPagesInit", () => ({
+          // ===== Main Page State =====
+          page: "panduan1",
+          darkMode: JSON.parse(localStorage.getItem("darkMode")) || false,
+          sidebarToggle:
+            JSON.parse(localStorage.getItem("sidebarToggle")) || false,
+          
+          // ===== NEW: Modal states for each sub-step =====
+          isStep1AModalOpen: false,
+          isStep1BModalOpen: false,
+          isStep1CModalOpen: false,
+          isStep2AModalOpen: false,
+          isStep2BModalOpen: false,
+          isStep3AModalOpen: false,
+          isStep3BModalOpen: false,
+          
+          token: null,
+          reviewerData: null,
+
+          // ===== Merged State from header.html =====
+          menuToggle: false,
+          isOpenUserModal: false,
+          userFormModelOldPassword: "",
+          userFormModelNewPassword: "",
+          userFormErrors: {},
+
+          // ===== Initialization =====
+          init() {
+            // Persist theme and sidebar state
+            this.$watch("darkMode", (value) =>
+              localStorage.setItem("darkMode", JSON.stringify(value)),
+            );
+            this.$watch("sidebarToggle", (value) =>
+              localStorage.setItem("sidebarToggle", JSON.stringify(value)),
+            );
+
+            // Check login and load user data
+            if (window.isLoggedIn()) {
+              this.token = localStorage.getItem("token");
+              this.reviewerData = JSON.parse(localStorage.getItem("reviewer"));
+            } else {
+              window.location.href = "/login.html";
+            }
+          },
+
+          // ===== Merged Methods from header.html =====
+          openUserFormModal() {
+            this.userFormErrors = {};
+            this.userFormModelOldPassword = "";
+            this.userFormModelNewPassword = "";
+            this.isOpenUserModal = true;
+          },
+
+          closeUserFormModal() {
+            this.isOpenUserModal = false;
+          },
+
+          async userFormSubmitForm() {
+            this.userFormErrors = {};
+            if (
+              !this.userFormModelOldPassword ||
+              this.userFormModelOldPassword.trim() === ""
+            ) {
+              this.userFormErrors.userFormModelOldPassword =
+                "Password lama harus diisi";
+            }
+            if (
+              !this.userFormModelNewPassword ||
+              this.userFormModelNewPassword.trim() === ""
+            ) {
+              this.userFormErrors.userFormModelNewPassword =
+                "Password baru harus diisi";
+            }
+
+            if (Object.keys(this.userFormErrors).length > 0) return;
+
+            try {
+              const res = await fetch(`${window.apiHost}/user/password`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${this.token}`,
+                },
+                body: JSON.stringify({
+                  old_password: this.userFormModelOldPassword,
+                  new_password: this.userFormModelNewPassword,
+                }),
+              });
+
+              const result = await res.json();
+              if (!res.ok) {
+                throw new Error(result.message || "Terjadi kesalahan.");
+              }
+
+              await window.swal.fire({
+                text: "Password berhasil diubah!",
+                icon: "success",
+              });
+
+              location.reload();
+            } catch (error) {
+              await window.swal.fire({
+                text: `Password gagal diubah!: ${
+                  error.message || "Terjadi kesalahan."
+                }`,
+                icon: "error",
+              });
+            }
+          },
+        }));
+      });
+    </script>
+  </head>
+  <body
+    x-data="panduanPagesInit"
+    :class="{'dark bg-gray-900': darkMode === true}"
+  >
+    <div class="flex h-screen overflow-hidden">
+      <include src="./partials/sidebar.html"></include>
+      <div
+        class="relative flex flex-1 flex-col overflow-x-hidden overflow-y-auto"
+      >
+        <include src="./partials/header.html" />
+        <main>
+          <div class="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
+            <div
+              class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <h2
+                class="text-2xl font-semibold text-gray-800 dark:text-white/90"
+              >
+                Panduan Proses Evaluasi
+              </h2>
+            </div>
+            <div
+              class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+            >
+              <h3
+                class="mb-6 text-xl font-semibold text-gray-800 dark:text-white/90"
+              >
+                Alur Proses Evaluasi
+              </h3>
+              <div class="max-w-3xl">
+                <div class="flex gap-x-6">
+                  <div class="w-24 h-16 flex-shrink-0"></div>
+
+                  <div class="relative w-9 flex-shrink-0">
+                    <div
+                      class="absolute inset-0 flex items-center justify-center"
+                    >
+                      <div
+                        class="h-full w-px border-l-2 border-dotted border-gray-300 dark:border-gray-600"
+                      ></div>
+                    </div>
+                    <div
+                      class="relative z-10 flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-white ring-8 ring-white dark:ring-gray-900"
+                    >
+                      <span class="text-lg font-bold">1</span>
+                    </div>
+                  </div>
+
+                  <div class="min-w-0 flex-grow pb-8">
+                    <div
+                      class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+                    >
+                      <h4
+                        class="mb-3 text-lg font-semibold text-gray-800 dark:text-white/90"
+                      >
+                        Permohonan Sertifikasi
+                      </h4>
+                      <div class="space-y-2">
+                        <div @click="isStep1AModalOpen = true" class="group cursor-pointer rounded-md p-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700/50">
+                          <p class="font-medium text-gray-700 group-hover:text-blue-600 dark:text-gray-300 dark:group-hover:text-blue-400">A. Pengiriman kelengkapan permohonan sertifikasi.</p>
+                        </div>
+                         <div @click="isStep1BModalOpen = true" class="group cursor-pointer rounded-md p-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700/50">
+                          <p class="font-medium text-gray-700 group-hover:text-blue-600 dark:text-gray-300 dark:group-hover:text-blue-400">B. Verifikasi kelengkapan dokumen.</p>
+                        </div>
+                         <div @click="isStep1CModalOpen = true" class="group cursor-pointer rounded-md p-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700/50">
+                          <p class="font-medium text-gray-700 group-hover:text-blue-600 dark:text-gray-300 dark:group-hover:text-blue-400">C. Penandatangan Surat Perjanjian.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex gap-x-6">
+                  <div class="flex w-24 flex-shrink-0 justify-end pt-1">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">TIMELINE</span>
+                  </div>
+                  <div class="relative w-9 flex-shrink-0">
+                    <div class="absolute inset-0 flex items-center justify-center">
+                      <div class="h-full w-px border-l-2 border-dotted border-gray-300 dark:border-gray-600"></div>
+                    </div>
+                  </div>
+                  <div class="w-full flex-grow pb-8"></div>
+                </div>
+                
+                <div class="flex gap-x-6">
+                  <div class="w-24 flex-shrink-0"></div>
+                  <div class="relative w-9 flex-shrink-0">
+                    <div class="absolute inset-0 flex items-center justify-center">
+                      <div class="h-full w-px border-l-2 border-dotted border-gray-300 dark:border-gray-600"></div>
+                    </div>
+                    <div class="relative z-10 flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-white ring-8 ring-white dark:ring-gray-900">
+                      <span class="text-lg font-bold">2</span>
+                    </div>
+                  </div>
+                  <div class="min-w-0 flex-grow pb-8">
+                     <div
+                      class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+                    >
+                      <h4
+                        class="mb-3 text-lg font-semibold text-gray-800 dark:text-white/90"
+                      >
+                        Determinasi
+                      </h4>
+                      <div class="space-y-2">
+                        <div @click="isStep2AModalOpen = true" class="group cursor-pointer rounded-md p-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700/50">
+                          <p class="font-medium text-gray-700 group-hover:text-blue-600 dark:text-gray-300 dark:group-hover:text-blue-400">A. Evaluasi kesesuaian informasi produk dan proses produksi.</p>
+                        </div>
+                         <div @click="isStep2BModalOpen = true" class="group cursor-pointer rounded-md p-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700/50">
+                          <p class="font-medium text-gray-700 group-hover:text-blue-600 dark:text-gray-300 dark:group-hover:text-blue-400">B. Audit Proses Produksi.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex gap-x-6">
+                  <div class="flex w-24 flex-shrink-0 justify-end pt-1">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">TIMELINE</span>
+                  </div>
+                  <div class="relative w-9 flex-shrink-0">
+                    <div class="absolute inset-0 flex items-center justify-center">
+                      <div class="h-full w-px border-l-2 border-dotted border-gray-300 dark:border-gray-600"></div>
+                    </div>
+                  </div>
+                  <div class="w-full flex-grow pb-8"></div>
+                </div>
+                
+                <div class="flex gap-x-6">
+                  <div class="w-24 flex-shrink-0"></div>
+                  <div class="relative w-9 flex-shrink-0">
+                    <div class="absolute inset-0 flex items-center justify-center">
+                      <div class="h-full w-px border-l-2 border-dotted border-gray-300 dark:border-gray-600"></div>
+                    </div>
+                    <div class="relative z-10 flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-white ring-8 ring-white dark:ring-gray-900">
+                      <span class="text-lg font-bold">3</span>
+                    </div>
+                  </div>
+                  <div class="min-w-0 flex-grow">
+                     <div
+                      class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+                    >
+                      <h4
+                        class="mb-3 text-lg font-semibold text-gray-800 dark:text-white/90"
+                      >
+                        Tinjauan dan Keputusan
+                      </h4>
+                      <div class="space-y-2">
+                        <div @click="isStep3AModalOpen = true" class="group cursor-pointer rounded-md p-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700/50">
+                          <p class="font-medium text-gray-700 group-hover:text-blue-600 dark:text-gray-300 dark:group-hover:text-blue-400">A. Peninjauan hasil evaluasi dan keputusan.</p>
+                        </div>
+                         <div @click="isStep3BModalOpen = true" class="group cursor-pointer rounded-md p-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700/50">
+                          <p class="font-medium text-gray-700 group-hover:text-blue-600 dark:text-gray-300 dark:group-hover:text-blue-400">B. Penyampaian Hasil Evaluasi.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="flex gap-x-6">
+                  <div class="w-24 flex-shrink-0"></div>
+                  <div class="relative w-9 flex-shrink-0">
+                    <div class="absolute inset-0 flex items-center justify-center">
+                      <div class="h-full w-px border-l-2 border-dotted border-gray-300 dark:border-gray-600"></div>
+                    </div>
+                  </div>
+                  <div class="w-full flex-grow pb-4"></div>
+                </div>
+
+                <div class="flex gap-x-6">
+                  <div class="w-24 flex-shrink-0"></div>
+                  <div class="relative w-9 flex-shrink-0">
+                    <div class="relative z-10 flex h-9 w-9 items-center justify-center rounded-full bg-green-500 text-white ring-8 ring-white dark:ring-gray-900">
+                      <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div class="min-w-0 flex-grow"></div>
+                </div>
+              </div>
+            </div>
+            </div>
+        </main>
+        </div>
+      </div>
+    <div x-show="isStep1AModalOpen" x-cloak @keydown.escape.window="isStep1AModalOpen = false" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 transition-opacity" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+        <div @click.outside="isStep1AModalOpen = false" class="w-full max-w-2xl transform rounded-2xl bg-white p-6 shadow-xl transition-all dark:bg-gray-800" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95">
+            <div class="flex items-center justify-between">
+                <h3 class="text-xl font-semibold text-gray-800 dark:text-white/90">Permohonan Sertifikasi</h3>
+                <button @click="isStep1AModalOpen = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <div class="prose prose-sm mt-4 max-w-none text-gray-600 dark:text-gray-400">
+                <dl>
+                    <dt class="font-semibold">A. Pengiriman Kelengkapan Permohonan Sertifikasi</dt>
+                    <dd class="pl-5">Kelengkapan Permohonan Sertifikasi Skema SCCI sesuai Perban BSSN Nomor 7 tahun 2024 terdiri dari:
+                        <ul class="list-[upper-alpha] list-inside mt-2">
+                            <li>Formulir Pengajuan Permohonan Sertifikasi yang sudah ditandatangani oleh Sponsor/Developer/Pemohon, mencakup:
+                                <ul class="list-disc list-inside ml-6">
+                                    <li>Informasi Sponsor/Developer/Pemohon</li>
+                                    <li>Informasi Produk</li>
+                                    <li>Informasi Proses Produksi</li>
+                                </ul>
+                            </li>
+                            <li>Dokumen Bukti Evaluasi</li>
+                            <li>TOE (khusus perangkat lunak)</li>
+                            <li>Dokumen EPP</li>
+                            <li>Surat Pernyataan Dokumen Penilaian ST dan Kecukupan Bukti Evaluasi dari Laboratorium Pengujian</li>
+                        </ul>
+                    </dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+    
+    <div x-show="isStep1BModalOpen" x-cloak @keydown.escape.window="isStep1BModalOpen = false" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 transition-opacity" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+        <div @click.outside="isStep1BModalOpen = false" class="w-full max-w-2xl transform rounded-2xl bg-white p-6 shadow-xl transition-all dark:bg-gray-800" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95">
+            <div class="flex items-center justify-between">
+                <h3 class="text-xl font-semibold text-gray-800 dark:text-white/90">Permohonan Sertifikasi</h3>
+                <button @click="isStep1BModalOpen = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <div class="prose prose-sm mt-4 max-w-none text-gray-600 dark:text-gray-400">
+                <dl>
+                    <dt class="font-semibold">B. Verifikasi Kelengkapan Dokumen</dt>
+                    <dd class="pl-5">Surat Jawaban dapat berisi penerimaan,
+penolakan, atau perbaikan.
+Apabila terdapat kekurangan
+kelengkapan persyaratan permohonan,
+Peninjau Permohonan dapat
+mengkonfirmasi melalui Penjamin Mutu
+dan Sponsor/Developer/Pemohon
+sertifikasi melengkapi kekurangan
+kelengkapan paling lama 5 (lima) hari
+kerja
+<br><br>
+Catatan: apabila sudah sah, maka akan dikirimkan surat jawaban yang sudah disahkan oleh Ka LSPro
+</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+    
+    <div x-show="isStep1CModalOpen" x-cloak @keydown.escape.window="isStep1CModalOpen = false" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 transition-opacity" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+        <div @click.outside="isStep1CModalOpen = false" class="w-full max-w-2xl transform rounded-2xl bg-white p-6 shadow-xl transition-all dark:bg-gray-800" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95">
+            <div class="flex items-center justify-between">
+                <h3 class="text-xl font-semibold text-gray-800 dark:text-white/90">Permohonan Sertifikasi</h3>
+                <button @click="isStep1CModalOpen = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <div class="prose prose-sm mt-4 max-w-none text-gray-600 dark:text-gray-400">
+                <dl>
+                    <dt class="font-semibold">C. Penandatangan Surat Perjanjian</dt>
+                    <dd class="pl-5">Jika hasil verifikasi sudah sah, tunggu Undangan Rapat Pembuka.<br><br>Rapat ini diperlukan untuk Penandatanganan Surat Perjanjian
+Sertifikasi (SLA) dan Non-Disclosure Agreement (NDA) antara Ka
+Pussertif bersama wakil dari
+Sponsor/Developer/Pemohon
+</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+    
+    <div x-show="isStep2AModalOpen" x-cloak @keydown.escape.window="isStep2AModalOpen = false" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 transition-opacity" x-transition>
+        <div @click.outside="isStep2AModalOpen = false" class="w-full max-w-2xl transform rounded-2xl bg-white p-6 shadow-xl transition-all dark:bg-gray-800">
+            <div class="flex items-center justify-between">
+                <h3 class="text-xl font-semibold text-gray-800 dark:text-white/90">Determinasi</h3>
+                <button @click="isStep2AModalOpen = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <div class="prose prose-sm mt-4 max-w-none text-gray-600 dark:text-gray-400">
+                <dl>
+                    <dt class="font-semibold">A. Evaluasi kesesuaian informasi produk dan proses produksi</dt>
+                    <dd class="pl-5">a. Jika hasil evaluasi menunjukkan ketidaksesuaian informasi Produk dan
+proses produksi, Sponsor/Developer/Pemohon dapat melakukan tindakan
+perbaikan<br>
+b. Jika hasil evaluasi sudah sesuai, maka dapat dilanjutkan ke proses
+Evaluasi Tahap 2
+<br><br>
+Tambahan:<br> 
+•	Tindakan perbaikan dalam jangka waktu paling lama 5 (lima) hari kerja sejak pemberitahuan diterima<br>
+•	Jika Sponsor/Developer/Pemohon tidak dapat menyelesaikan tindakan perbaikan sesuai jangka waktu yang ditetapkan, LSPro dapat menghentikan proses sertifikasi dan tidak melanjutkan proses sertifikasi ke tahap berikutnya
+</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="isStep2BModalOpen" x-cloak @keydown.escape.window="isStep2BModalOpen = false" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 transition-opacity" x-transition>
+        <div @click.outside="isStep2BModalOpen = false" class="w-full max-w-2xl transform rounded-2xl bg-white p-6 shadow-xl transition-all dark:bg-gray-800">
+            <div class="flex items-center justify-between">
+                <h3 class="text-xl font-semibold text-gray-800 dark:text-white/90">Determinasi</h3>
+                <button @click="isStep2BModalOpen = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <div class="prose prose-sm mt-4 max-w-none text-gray-600 dark:text-gray-400">
+                <dl>
+                    <dt class="mt-2 font-semibold">B. Audit Proses Produksi</dt>
+                    <dd class="pl-5">Petugas Pengambil Contoh (PPC) akan melakukan pengambilan sampel TOE jika berupa perangkat keras
+
+Kegiatan pengambilan sampel dilakukan bersamaan dengan kegiatan Audit
+Proses Produksi. <br><br>
+Pengambilan sampel TOE berbentuk perangkat keras dilakukan di lokasi
+produksi dengan jumlah sampel sebagaimana diuraikan pada daftar
+Produk, acuan CC, acuan SNI, dan uraian penilaian kesesuaian.
+<br><br>
+Audit Proses Produksi dilakukan saat Sponsor/Developer/Pemohon
+melakukan proses produksi pembuatan TOE yang diajukan untuk
+disertifikasi.<br>
+•	Jika hasil audit proses produksi menunjukkan ketidaksesuaian pada pengendalian proses dan mutu Produk yang berakibat pada kegagalan Produk untuk memenuhi persyaratan, maka Sponsor/Developer/Pemohon dapat melakukan tindakan perbaikan dalam jangka waktu sesuai kebijakan LSPro sejak pemberitahuan diterima<br>
+•	Jika Sponsor/Developer/Pemohon tidak dapat menyelesaikan tindakan perbaikan sesuai jangka waktu yang ditetapkan, LSPro dapat menghentikan proses sertifikasi dan tidak melanjutkan proses sertifikasi ke tahap berikutnya
+<br><br>
+Jika dinyatakan tidak lolos, pihak BSSN akan mengirim surat pemberhentian proses sertifikasi.
+
+</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="isStep3AModalOpen" x-cloak @keydown.escape.window="isStep3AModalOpen = false" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 transition-opacity" x-transition>
+        <div @click.outside="isStep3AModalOpen = false" class="w-full max-w-2xl transform rounded-2xl bg-white p-6 shadow-xl transition-all dark:bg-gray-800">
+            <div class="flex items-center justify-between">
+                <h3 class="text-xl font-semibold text-gray-800 dark:text-white/90">Tinjauan dan Keputusan</h3>
+                <button @click="isStep3AModalOpen = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <div class="prose prose-sm mt-4 max-w-none text-gray-600 dark:text-gray-400">
+                <dl>
+                    <dt class="font-semibold">A. Peninjauan hasil evaluasi dan keputusan</dt>
+                    <dd class="pl-5">Pihak BSSN akan meninjau hasil evaluasi dan melakukan pengambilan Keputusan sertifikasi.</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="isStep3BModalOpen" x-cloak @keydown.escape.window="isStep3BModalOpen = false" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 transition-opacity" x-transition>
+        <div @click.outside="isStep3BModalOpen = false" class="w-full max-w-2xl transform rounded-2xl bg-white p-6 shadow-xl transition-all dark:bg-gray-800">
+            <div class="flex items-center justify-between">
+                <h3 class="text-xl font-semibold text-gray-800 dark:text-white/90">Tinjauan dan Keputusan</h3>
+                <button @click="isStep3BModalOpen = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <div class="prose prose-sm mt-4 max-w-none text-gray-600 dark:text-gray-400">
+                <dl>
+                    <dt class="mt-2 font-semibold">B. Penyampaian Hasil Evaluasi</dt>
+                    <dd class="pl-5">Pihak BSSN akan mengirim Undangan Rapat Penutup serah terima ST, CR, dan Sertifikat Keamanan Teknologi Perlindungan IIV.</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    </body>
+</html>

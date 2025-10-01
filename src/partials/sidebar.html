@@ -1,4 +1,5 @@
 <aside
+  x-data="{ showPanduan: false }"
   :class="sidebarToggle ? 'translate-x-0 lg:w-[90px]' : '-translate-x-full'"
   class="sidebar fixed top-0 left-0 z-999 flex h-screen w-[290px] flex-col overflow-y-hidden border-r border-gray-200 bg-white px-5 duration-400 lg:static lg:translate-x-0 dark:border-gray-800 dark:bg-black"
 >
@@ -109,6 +110,86 @@
             </a>
           </li>
           <!-- Menu Item TOE -->
+          <!-- Panduan parent menu item with dropdown toggle -->
+          <li>
+              <div class="group">
+                  <a
+                      href="#"
+                      @click.prevent="showPanduan = !showPanduan"
+                      class="menu-item group flex items-center justify-between cursor-pointer"
+                      :class="page.startsWith('panduan') ? 'menu-item-active' : 'menu-item-inactive'"
+                  >
+                      <span class="flex items-center">
+                          <svg
+                              :class="page.startsWith('panduan') ? 'menu-item-icon-active' : 'menu-item-icon-inactive'"
+                              width="24"
+                              height="24"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                          >
+                              <path
+                                  fill-rule="evenodd"
+                                  clip-rule="evenodd"
+                                  d="M6 4C5.44772 4 5 4.44772 5 5V19C5 19.5523 5.44772 20 6 20H18C18.5523 20 19 19.5523 19 19V5C19 4.44772 18.5523 4 18 4H6ZM7 6H17V18H7V6ZM9 8V16H15V8H9Z"
+                                  fill="currentColor"
+                              />
+                          </svg>
+                          <span
+                              class="menu-item-text"
+                              :class="sidebarToggle ? 'lg:hidden' : ''"
+                          >
+                              Panduan
+                          </span>
+                      </span>
+                      <!-- Chevron icon for dropdown -->
+                      <svg
+                          class="ml-2 w-4 h-4 transition-transform duration-200"
+                          :class="showPanduan ? 'rotate-180' : ''"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                      >
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                      </svg>
+                  </a>
+                  <!-- Submenu, toggled by showPanduan, using x-show and x-collapse -->
+                  <ul
+                      class="mt-2 flex flex-col gap-2"
+                      x-show="showPanduan"
+                      x-collapse
+                  >
+                      <li>
+                          <a
+                              href="panduan1.html"
+                              class="menu-item group"
+                              :class="page === 'panduan1' ? 'menu-item-active pointer-events-none' : 'menu-item-inactive'"
+                          >
+                            <span >Tahapan Sertifikasi</span>
+                          </a>
+                      </li>
+                      <li>
+                          <a
+                              href="panduan2.html"
+                              class="menu-item group"
+                              :class="page === 'panduan2' ? 'menu-item-active pointer-events-none' : 'menu-item-inactive'"
+                          >
+                            <span >Keluhan dan Banding</span>
+                          </a>
+                      </li>
+                      <li>
+                          <a
+                              href="panduan3.html"
+                              class="menu-item group"
+                              :class="page === 'panduan3' ? 'menu-item-active pointer-events-none' : 'menu-item-inactive'"
+                          >
+                            <span >Surveillance</span>
+                          </a>
+                      </li>
+                  </ul>
+              </div>
+          </li>
+          <!-- End Panduan parent menu item -->
         </ul>
       </div>
     </nav>
