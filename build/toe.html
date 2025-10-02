@@ -435,28 +435,28 @@
                       <li>
                           <a
                               href="panduan1.html"
-                              class="menu-item group pl-11"
+                              class="menu-item group"
                               :class="page === 'panduan1' ? 'menu-item-active pointer-events-none' : 'menu-item-inactive'"
                           >
-                              Panduan 1
+                            <span >Tahapan Sertifikasi</span>
                           </a>
                       </li>
                       <li>
                           <a
-                              href="/panduan/panduan2.html"
-                              class="menu-item group pl-11"
+                              href="panduan2.html"
+                              class="menu-item group"
                               :class="page === 'panduan2' ? 'menu-item-active pointer-events-none' : 'menu-item-inactive'"
                           >
-                              Panduan 2
+                            <span >Keluhan dan Banding</span>
                           </a>
                       </li>
                       <li>
                           <a
-                              href="/panduan/panduan3.html"
-                              class="menu-item group pl-11"
+                              href="panduan3.html"
+                              class="menu-item group"
                               :class="page === 'panduan3' ? 'menu-item-active pointer-events-none' : 'menu-item-inactive'"
                           >
-                              Panduan 3
+                            <span >Surveillance</span>
                           </a>
                       </li>
                   </ul>
@@ -526,6 +526,7 @@
             method: "POST",
             headers: {
               "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({
               old_password: this.userFormModelOldPassword,
